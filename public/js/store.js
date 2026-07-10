@@ -58,7 +58,6 @@ async function loadConfig() {
     if (SITE.notice) renderNotice([SITE.notice]);
   }
   renderTabs();
-  renderCategoryNav();
 }
 
 function renderTabs() {
@@ -71,22 +70,11 @@ function renderTabs() {
     `<a class="drawer-tab ${s === currentCat ? 'active' : ''}" data-cat="${s}">${names[s]} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></a>`).join('');
 }
 
-function renderCategoryNav() {
-  $('#categoryNav').innerHTML = CATS.map(c => {
-    const t = TONE[c.slug] || TONE.ai;
-    return `<div class="cat-card" data-cat="${c.slug}" style="--cat-color:${t.color};--cat-grad:${t.grad};">
-      <div class="cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${t.icon}</svg></div>
-      <div class="cat-info"><b>${c.name}</b><small>${c.description || ''}</small></div>
-      <div class="cat-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></div>
-    </div>`;
-  }).join('');
-}
-
 // ---------------- 公告 ----------------
 function renderNotice(list) {
   const track = $('#noticeTrack');
   if (!list.length) { track.innerHTML = ''; return; }
-  track.innerHTML = list.map(t => `<div class="notice-item"><span class="n-tag">公告</span><span>${t}</span></div>`).join('');
+  track.innerHTML = list.map(t => `<div class="notice-item"><span>${t}</span></div>`).join('');
   if (list.length > 1) {
     let i = 0;
     setInterval(() => { i = (i + 1) % list.length; track.style.transform = `translateY(-${i * 22}px)`; }, 3500);
@@ -271,7 +259,6 @@ function switchCat(cat) {
 }
 $('#headerTabs').onclick = (e) => { const b = e.target.closest('.tab-btn'); if (b) switchCat(b.dataset.cat); };
 $('#drawerTabs').onclick = (e) => { const b = e.target.closest('.drawer-tab'); if (b) { switchCat(b.dataset.cat); closeDrawer(); } };
-$('#categoryNav').onclick = (e) => { const c = e.target.closest('.cat-card'); if (c) { switchCat(c.dataset.cat); } };
 $('#feedSort').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; $$('#feedSort button').forEach(x => x.classList.remove('active')); b.classList.add('active'); loadProducts(); };
 
 const themeIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
@@ -288,14 +275,26 @@ $('#bannerNext').onclick = () => goBanner(bIdx + 1);
 $('#bannerZone').addEventListener('pointerdown', () => { clearInterval(bTimer); });
 $('#bannerZone').addEventListener('pointerup', resetBanner);
 
-// 搜索框
+// 搜索框（置于顶部 header，桌面 + 移动端）
 (function () {
-  const head = $('.feed-head');
-  const box = document.createElement('div');
-  box.style.cssText = 'display:flex;align-items:center;gap:8px;';
-  box.innerHTML = '<input id="searchInput" type="text" placeholder="搜索商品…" style="padding:8px 14px;border-radius:10px;background:var(--color-surface-soft);border:1px solid var(--color-line);outline:none;font-size:13px;min-width:180px;">';
-  head.insertBefore(box, head.querySelector('.feed-tools'));
-  $('#searchInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { currentQ = e.target.value.trim(); currentPage = 1; loadProducts(); } });
+  const bind = (sel) => {
+    const el = $(sel);
+    if (!el) return;
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        currentQ = e.target.value.trim();
+        currentPage = 1;
+        loadProducts();
+        // 同步另一个搜索框
+        const other = sel === '#headerSearch' ? $('#mobileSearch') : $('#headerSearch');
+        if (other && other.value !== e.target.value) other.value = e.target.value;
+        // 若在抽屉里搜索，收起抽屉
+        if (sel === '#mobileSearch' && typeof closeDrawer === 'function') closeDrawer();
+      }
+    });
+  };
+  bind('#headerSearch');
+  bind('#mobileSearch');
 })();
 
 // ---------------- 启动 ----------------

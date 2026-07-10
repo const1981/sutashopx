@@ -19,7 +19,10 @@
     </a>
     <nav class="header-tabs" id="headerTabs"></nav>
     <div class="header-actions">
-      <a class="btn" href="/admin.html">后台</a>
+      <div class="hsearch">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="headerSearch" type="text" placeholder="搜索商品…">
+      </div>
       <button class="icon-btn" id="themeToggle" title="切换主题" aria-label="切换主题">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
       </button>
@@ -28,6 +31,10 @@
   <div class="shell mobile-shell">
     <button class="hamburger" id="hamburger" aria-label="菜单"><span></span><span></span><span></span></button>
     <a class="brand" href="/"><div class="brand-logo">B</div><div class="brand-name"><b>BU31 商城</b></div></a>
+    <div class="hsearch mobile">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="mobileSearch" type="text" placeholder="搜索商品…">
+    </div>
     <button class="icon-btn" id="themeToggleMobile" aria-label="切换主题"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
   </div>
 </header>
@@ -37,7 +44,6 @@
 <aside class="drawer-panel" id="drawerPanel">
   <div class="drawer-head"><div class="brand-logo">B</div><div class="brand-name"><b>BU31 商城</b><small>AI · 工具 · 项目 · 素材</small></div></div>
   <nav class="drawer-tabs" id="drawerTabs"></nav>
-  <div class="drawer-section"><a class="drawer-tab" href="/admin.html">管理后台 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></a></div>
 </aside>
 
 <!-- ============== MAIN ============== -->
@@ -58,9 +64,6 @@
     <div class="notice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 0-7 7c0 3-1 4-2 5h18c-1-1-2-2-2-5a7 7 0 0 0-7-7zM9 19a3 3 0 0 0 6 0"/></svg>公告</div>
     <div class="notice-viewport"><div class="notice-track" id="noticeTrack"></div></div>
   </section>
-
-  <!-- ③ 分类导航 -->
-  <section class="category-quick-switch" id="categoryNav"></section>
 
   <!-- ④ 商品列表 -->
   <section class="feed-shell" id="feedShell">
