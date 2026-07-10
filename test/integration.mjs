@@ -276,5 +276,22 @@ ok('读取不存在文件 404', r.status === 404, r.status);
 r = await worker.fetch(req('GET', '/'), env, ctx);
 ok('根路径返回静态资源', r.status === 200);
 
+// 18. 订单批量删除
+r = await worker.fetch(req('GET', '/api/admin/orders?status=all', null, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('后台订单列表可拉取', r.status === 200 && Array.isArray(d.data.items), d.data);
+const before = d.data.items.length;
+ok('存在可用于删除的订单(>=2)', before >= 2, before);
+const delIds = d.data.items.slice(0, 2).map(o => o.id);
+r = await worker.fetch(req('DELETE', '/api/admin/orders', { ids: delIds }, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('批量删除订单成功', r.status === 200 && d.data.ok && d.data.deleted === 2, d.data);
+r = await worker.fetch(req('GET', '/api/admin/orders?status=all', null, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('删除后订单数减少 2', d.data.items.length === before - 2, d.data.items.length);
+// 空 ids 应被拒
+r = await worker.fetch(req('DELETE', '/api/admin/orders', { ids: [] }, { Authorization: 'Bearer ' + token }), env, ctx);
+ok('空 ids 批量删除被拒', r.status !== 200);
+
 console.log(`\n集成测试结果：通过 ${pass} / 失败 ${fail}`);
 process.exit(fail ? 1 : 0);

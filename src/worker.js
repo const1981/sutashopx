@@ -1149,6 +1149,17 @@ async function handleApi(request, env, ctx) {
     return json({ items: list, page, pageSize, total: totalRow.n, totalPages: Math.max(1, Math.ceil(totalRow.n / pageSize)) });
   }
 
+  // 批量删除订单（接收 { ids: [...] }）
+  if (path === '/api/admin/orders' && method === 'DELETE') {
+    let b;
+    try { b = await request.json(); } catch { return jsonErr('请求体格式错误'); }
+    const ids = Array.isArray(b.ids) ? b.ids.map(Number).filter(id => Number.isInteger(id) && id > 0) : [];
+    if (!ids.length) return jsonErr('未选择订单');
+    const placeholders = ids.map(() => '?').join(',');
+    await run(env, `DELETE FROM orders WHERE id IN (${placeholders})`, ...ids);
+    return json({ ok: true, deleted: ids.length });
+  }
+
   // 订单详情
   m = path.match(/^\/api\/admin\/orders\/(\d+)$/);
   if (m && method === 'GET') {

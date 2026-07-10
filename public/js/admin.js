@@ -279,18 +279,23 @@ async function renderOrders() {
   const r = await api('/api/admin/orders?status=' + status);
   if (!r.ok) return;
   const items = r.data.items || [];
+  const dtMap = { CARD_AUTO: '卡密', FIXED: '固定内容', MANUAL: '人工' };
+  const badgeMap = { PENDING: 'badge-orange', PAID: 'badge-blue', DELIVERED: 'badge-green', CLOSED: 'badge-gray', FAILED: 'badge-red' };
   const rows = items.length ? items.map(o => {
-    const badge = { PENDING: 'badge-orange', PAID: 'badge-blue', DELIVERED: 'badge-green', CLOSED: 'badge-gray', FAILED: 'badge-red' }[o.status] || 'badge-gray';
+    const badge = badgeMap[o.status] || 'badge-gray';
+    const dt = dtMap[o.delivery_type] || '-';
     return `<tr>
+      <td class="col-chk"><input type="checkbox" class="ord-chk" data-id="${o.id}"></td>
       <td><b>${o.order_no}</b></td>
       <td>${o.product_name}</td>
       <td>${money(o.amount)}</td>
       <td>×${o.quantity}</td>
       <td><span class="badge ${badge}">${o.status}</span></td>
+      <td>${dt}</td>
       <td>${o.contact_value || '-'}</td>
       <td>${new Date(o.created_at * 1000).toLocaleString()}</td>
       <td><button class="mini-btn" data-oid="${o.id}">详情</button></td></tr>`;
-  }).join('') : '<tr><td colspan="8" class="empty">暂无订单</td></tr>';
+  }).join('') : '<tr><td colspan="10" class="empty">暂无订单</td></tr>';
   $('#panel-orders').innerHTML = `
     <div class="toolbar">
       <select id="orderFilter">
@@ -298,14 +303,40 @@ async function renderOrders() {
         <option value="PAID">已支付</option><option value="DELIVERED">已发货</option>
         <option value="CLOSED">已关闭</option><option value="FAILED">失败</option>
       </select>
+      <label class="chk-all"><input type="checkbox" id="orderSelectAll"> 全选</label>
+      <button class="mini-btn danger" id="orderBatchDel" disabled>删除选中 (0)</button>
       <div class="grow"></div>
     </div>
     <div class="table-card"><table class="data">
-      <tr><th>订单号</th><th>商品</th><th>金额</th><th>数量</th><th>状态</th><th>联系</th><th>创建时间</th><th>操作</th></tr>
+      <tr><th class="col-chk"><input type="checkbox" id="orderSelectAllHead"></th><th>订单号</th><th>商品</th><th>金额</th><th>数量</th><th>状态</th><th>发货方式</th><th>联系</th><th>创建时间</th><th>操作</th></tr>
       ${rows}</table></div>`;
   $('#orderFilter').value = status;
   $('#orderFilter').onchange = renderOrders;
   $$('#panel-orders [data-oid]').forEach(b => b.onclick = () => openOrder(+b.dataset.oid));
+
+  // 选择 / 批量删除逻辑
+  const checks = $$('#panel-orders .ord-chk');
+  const syncSel = () => {
+    const sel = checks.filter(c => c.checked);
+    const btn = $('#orderBatchDel');
+    btn.disabled = sel.length === 0;
+    btn.textContent = '删除选中 (' + sel.length + ')';
+    const all = checks.length > 0 && sel.length === checks.length;
+    $('#orderSelectAll').checked = all;
+    $('#orderSelectAllHead').checked = all;
+  };
+  checks.forEach(c => c.onchange = syncSel);
+  const doSelectAll = (checked) => { checks.forEach(c => c.checked = checked); syncSel(); };
+  $('#orderSelectAll').onchange = (e) => doSelectAll(e.target.checked);
+  $('#orderSelectAllHead').onchange = (e) => doSelectAll(e.target.checked);
+  $('#orderBatchDel').onclick = async () => {
+    const sel = checks.filter(c => c.checked).map(c => +c.dataset.id);
+    if (!sel.length) return;
+    if (!confirm('确定删除选中的 ' + sel.length + ' 个订单？此操作不可恢复。')) return;
+    const rr = await api('/api/admin/orders', 'DELETE', { ids: sel });
+    if (rr.ok) { toast('已删除 ' + (rr.data.deleted || sel.length) + ' 个订单'); renderOrders(); }
+    else toast(rr.data.error || '删除失败');
+  };
 }
 
 async function openOrder(id) {
@@ -322,6 +353,7 @@ async function openOrder(id) {
       商品：<b>${o.product_name}</b><br>
       金额：${money(o.amount)} · 数量 ×${o.quantity}<br>
       状态：<span class="badge ${o.status === 'DELIVERED' ? 'badge-green' : o.status === 'PAID' ? 'badge-blue' : o.status === 'PENDING' ? 'badge-orange' : 'badge-gray'}">${o.status}</span><br>
+      发货方式：${({ CARD_AUTO: '卡密', FIXED: '固定内容', MANUAL: '人工' })[o.delivery_type] || '-'}<br>
       支付方式：${o.payment_provider || '-'}<br>
       联系：${o.contact_value || '-'}<br>
       创建：${new Date(o.created_at * 1000).toLocaleString()}
