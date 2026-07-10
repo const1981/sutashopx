@@ -89,7 +89,7 @@ async function afterLogin() {
 }
 
 // ---------- 导航 ----------
-const TITLES = { overview: '概览', products: '商品管理', orders: '订单管理', banners: '幻灯片管理', gateways: '支付配置', categories: '分类管理', settings: '站点设置' };
+const TITLES = { overview: '概览', products: '商品管理', orders: '订单管理', banners: '幻灯片管理', gateways: '支付配置', categories: '分类管理', machine: '机器批量', settings: '站点设置' };
 function switchTab(tab) {
   $$('#adminNav button[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   $$('.admin-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
@@ -100,6 +100,7 @@ function switchTab(tab) {
   if (tab === 'banners') renderBanners();
   if (tab === 'gateways') renderGateways();
   if (tab === 'categories') renderCategories();
+  if (tab === 'machine') renderMachine();
   if (tab === 'settings') renderSettings();
 }
 $('#adminNav').onclick = (e) => { const b = e.target.closest('button[data-tab]'); if (b) switchTab(b.dataset.tab); };
@@ -644,6 +645,70 @@ async function openCatForm(id) {
   };
 }
 
+// ---------- 机器批量（AI 运营入口）----------
+async function renderMachine() {
+  $('#panel-machine').innerHTML = `
+    <div class="table-card" style="padding:22px;">
+      <p style="color:var(--color-ink-soft);font-size:13px;line-height:1.7;margin-bottom:16px;">
+        此面板供 <b>AI / 脚本</b> 批量运营使用。调用接口需在请求头带 <code>x-api-key</code>（在 Cloudflare 后台设置的 <code>AI_API_KEY</code> 变量），与后台账号密码隔离。<br>
+        接口：<br>
+        • <code>POST /api/machine/products/bulk</code> —— 批量建商品（JSON 数组，每项含 name/price/category_slug/delivery_type 等）<br>
+        • <code>POST /api/machine/products/{id}/keys</code> —— 批量导入卡密（{ "keys": ["k1","k2"] } 或换行字符串）<br>
+        • <code>DELETE /api/machine/category/{slug}</code> —— 整类清空（商品+卡密）
+      </p>
+      <div class="field"><label>API Key (x-api-key)</label><input id="m_key" type="password" placeholder="在 Cloudflare 后台设置的 AI_API_KEY"></div>
+      <div class="field"><label>操作</label>
+        <select id="m_op">
+          <option value="products">批量建商品</option>
+          <option value="keys">导入卡密到商品</option>
+          <option value="clearcat">整类清空</option>
+        </select>
+      </div>
+      <div class="field" id="m_pid_field" style="display:none;"><label>商品 ID（导入卡密时填）</label><input id="m_pid" type="number" placeholder="商品数字 ID"></div>
+      <div class="field" id="m_slug_field"><label>分类 slug（整类清空时填，如 ai）</label><input id="m_slug" placeholder="ai"></div>
+      <div class="field"><label>JSON 内容</label>
+        <textarea id="m_body" style="min-height:200px;font-family:monospace;" placeholder='批量建商品示例：\n[\n  {"name":"ChatGPT  Plus","price":19.9,"category_slug":"ai","delivery_type":"CARD_AUTO"}\n]'></textarea>
+      </div>
+      <button class="btn btn-primary" id="m_run" style="width:100%;justify-content:center;padding:11px;margin-top:8px;">执行</button>
+      <pre id="m_out" style="margin-top:14px;background:var(--color-surface-soft);border:1px solid var(--color-line);border-radius:8px;padding:12px;font-size:12px;white-space:pre-wrap;max-height:240px;overflow:auto;display:none;"></pre>
+    </div>`;
+
+  const op = $('#m_op');
+  const syncOp = () => {
+    $('#m_pid_field').style.display = op.value === 'keys' ? 'block' : 'none';
+    $('#m_slug_field').style.display = op.value === 'clearcat' ? 'block' : 'none';
+    $('#m_body').style.display = op.value === 'clearcat' ? 'none' : 'block';
+  };
+  op.onchange = syncOp; syncOp();
+
+  $('#m_run').onclick = async () => {
+    const key = $('#m_key').value.trim(), opv = op.value;
+    if (!key) { toast('请填写 API Key'); return; }
+    let path, method = 'POST', body = null;
+    try {
+      if (opv === 'products') { path = '/api/machine/products/bulk'; body = JSON.parse($('#m_body').value); }
+      else if (opv === 'keys') {
+        const pid = $('#m_pid').value.trim();
+        if (!pid) { toast('请填写商品 ID'); return; }
+        path = '/api/machine/products/' + pid + '/keys';
+        const raw = $('#m_body').value.trim();
+        try { body = JSON.parse(raw); } catch { body = { keys: raw }; }
+      } else { path = '/api/machine/category/' + $('#m_slug').value.trim(); method = 'DELETE'; }
+    } catch (e) { toast('JSON 解析失败：' + e.message); return; }
+    const out = $('#m_out'); out.style.display = 'block'; out.textContent = '请求中…';
+    try {
+      const r = await fetch(path, {
+        method, headers: { 'Content-Type': 'application/json', 'x-api-key': key },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      const d = await r.json().catch(() => ({}));
+      out.textContent = 'HTTP ' + r.status + '\n' + JSON.stringify(d, null, 2);
+      if (r.ok) { toast('执行成功'); if (opv !== 'clearcat') renderMachine(); }
+      else toast(d.error || '执行失败');
+    } catch (e) { out.textContent = '请求异常：' + e.message; }
+  };
+}
+
 // ---------- 设置 ----------
 async function renderSettings() {
   const r = await api('/api/admin/settings');
@@ -663,7 +728,8 @@ async function renderSettings() {
       <button class="btn btn-primary" id="s_save" style="width:100%;justify-content:center;padding:11px;margin-top:8px;">保存设置</button>
       <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--color-line);">
         <h3 style="font-size:14px;margin-bottom:10px;">修改管理员密码</h3>
-        <div class="field"><label>新密码</label><input id="s_pwd" type="password" placeholder="留空则不修改"></div>
+        <div class="field"><label>当前密码</label><input id="s_pwd_old" type="password" placeholder="请输入当前密码"></div>
+        <div class="field"><label>新密码</label><input id="s_pwd" type="password" placeholder="至少 6 位"></div>
         <button class="btn" id="s_pwd_btn" style="width:100%;justify-content:center;padding:11px;">更新密码</button>
       </div>
     </div>`;
@@ -673,11 +739,12 @@ async function renderSettings() {
     if (r2.ok) toast('设置已保存'); else toast(r2.data.error || '保存失败');
   };
   $('#s_pwd_btn').onclick = async () => {
+    const old = $('#s_pwd_old').value;
     const pwd = $('#s_pwd').value;
-    if (!pwd) { toast('请输入新密码'); return; }
-    // 通过登录接口无法直接改密码；这里用 settings 之外的方式：调用专用接口
-    const r2 = await api('/api/admin/password', 'PUT', { password: pwd });
-    if (r2.ok) { toast('密码已更新'); $('#s_pwd').value = ''; } else toast(r2.data.error || '更新失败');
+    if (!old) { toast('请输入当前密码'); return; }
+    if (!pwd) { toast('请输入新密码（至少 6 位）'); return; }
+    const r2 = await api('/api/admin/password', 'PUT', { old_password: old, password: pwd });
+    if (r2.ok) { toast('密码已更新，请用新密码重新登录'); $('#s_pwd_old').value = ''; $('#s_pwd').value = ''; } else toast(r2.data.error || '更新失败');
   };
 }
 

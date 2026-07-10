@@ -59,6 +59,7 @@ const env = {
   ASSETS: { fetch: () => new Response('static', { status: 200 }) },
   R2: fakeR2,
   AUTH_SECRET: 'integration-secret',
+  AI_API_KEY: 'test-machine-key-123',
   PAYMENT_MODE: 'demo',
   STRIPE_CURRENCY: 'usd',
 };
@@ -169,11 +170,14 @@ d = await jr(r);
 ok('固定内容商品发货内容为 HELLO', d.data.keys.includes('HELLO'), d.data.keys);
 ok('固定内容商品状态为已发货(DELIVERED)', d.data.status === 'DELIVERED', d.data.status);
 
-// 13. 修改密码
-r = await worker.fetch(req('PUT', '/api/admin/password', { password: 'newpass123' }, { Authorization: 'Bearer ' + token }), env, ctx);
+// 13. 修改密码（需旧密码）
+r = await worker.fetch(req('PUT', '/api/admin/password', { old_password: 'admin123456', password: 'newpass123' }, { Authorization: 'Bearer ' + token }), env, ctx);
 ok('修改密码成功', r.status === 200);
 r = await worker.fetch(req('POST', '/api/admin/login', { username: 'admin', password: 'newpass123' }), env, ctx);
 ok('新密码可登录', r.status === 200);
+// 改回默认，避免影响后续用例
+r = await worker.fetch(req('PUT', '/api/admin/password', { old_password: 'newpass123', password: 'admin123456' }, { Authorization: 'Bearer ' + token }), env, ctx);
+ok('改回默认密码成功', r.status === 200);
 
 // 14. 幻灯片后台 CRUD
 r = await worker.fetch(req('GET', '/api/admin/banners', null, { Authorization: 'Bearer ' + token }), env, ctx);
@@ -292,6 +296,42 @@ ok('删除后订单数减少 2', d.data.items.length === before - 2, d.data.item
 // 空 ids 应被拒
 r = await worker.fetch(req('DELETE', '/api/admin/orders', { ids: [] }, { Authorization: 'Bearer ' + token }), env, ctx);
 ok('空 ids 批量删除被拒', r.status !== 200);
+
+// 19. 修改密码（旧密码校验）
+const newPwd = 'newpass123';
+r = await worker.fetch(req('PUT', '/api/admin/password', { password: newPwd }, { Authorization: 'Bearer ' + token }), env, ctx);
+ok('缺少旧密码改密被拒', r.status !== 200, r.status);
+r = await worker.fetch(req('PUT', '/api/admin/password', { old_password: 'wrong', password: newPwd }, { Authorization: 'Bearer ' + token }), env, ctx);
+ok('旧密码错误改密被拒', r.status !== 200, r.status);
+r = await worker.fetch(req('PUT', '/api/admin/password', { old_password: 'admin123456', password: newPwd }, { Authorization: 'Bearer ' + token }), env, ctx);
+ok('旧密码正确改密成功', r.status === 200 && (await jr(r)).data.ok, r.status);
+// 改回默认，避免影响其他依赖默认密码的场景
+r = await worker.fetch(req('PUT', '/api/admin/password', { old_password: newPwd, password: 'admin123456' }, { Authorization: 'Bearer ' + token }), env, ctx);
+ok('改回默认密码成功', r.status === 200, r.status);
+
+// 20. 机器批量接口（x-api-key 鉴权 + 批量建商品/导入卡密/整类清空）
+const MKEY = 'test-machine-key-123';
+const mreq = (method, path, body) => req(method, path, body, { 'x-api-key': MKEY });
+r = await worker.fetch(req('POST', '/api/machine/products/bulk', [{ name: 'x' }]), env, ctx);
+ok('无 x-api-key 被拒(401)', r.status === 401, r.status);
+r = await worker.fetch(req('POST', '/api/machine/products/bulk', [{ name: 'x' }], { 'x-api-key': 'wrong' }), env, ctx);
+ok('错误 x-api-key 被拒(401)', r.status === 401, r.status);
+r = await worker.fetch(mreq('POST', '/api/machine/products/bulk', [
+  { name: '机批量商品A', price: 9.9, category_slug: 'ai', delivery_type: 'CARD_AUTO' },
+  { name: '机批量商品B', price: 0, category_slug: 'ai', delivery_type: 'FIXED', fixed_content: 'CONTENT-B' }
+]), env, ctx);
+d = await jr(r);
+ok('批量建商品成功', r.status === 200 && d.data.created === 2, d.data);
+const newPid = d.data.ids[0];
+r = await worker.fetch(mreq('POST', '/api/machine/products/' + newPid + '/keys', { keys: ['K1', 'K2', 'K3'] }), env, ctx);
+d = await jr(r);
+ok('批量导入卡密成功(3条)', r.status === 200 && d.data.imported === 3, d.data);
+r = await worker.fetch(req('GET', '/api/products?cat=ai', null, {}), env, ctx);
+d = await jr(r);
+ok('新商品出现在列表', d.data.items.some(it => it.id === newPid), d.data.items.length);
+r = await worker.fetch(mreq('DELETE', '/api/machine/category/ai'), env, ctx);
+d = await jr(r);
+ok('整类清空成功(删除商品数>0)', r.status === 200 && d.data.deletedProducts > 0, d.data);
 
 console.log(`\n集成测试结果：通过 ${pass} / 失败 ${fail}`);
 process.exit(fail ? 1 : 0);

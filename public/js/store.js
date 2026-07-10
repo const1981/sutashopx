@@ -122,7 +122,15 @@ function goBanner(i) { bIdx = (i + BANNERS.length) % BANNERS.length; $('#bannerT
 function resetBanner() { clearInterval(bTimer); bTimer = setInterval(() => goBanner(bIdx + 1), 5000); }
 
 // ---------------- 商品列表 ----------------
+function skeletonHTML(n = 8) {
+  let cards = '';
+  for (let i = 0; i < n; i++) {
+    cards += `<div class="skel-card"><div class="skel-thumb"></div><div class="skel-body"><div class="skel-line lg w70"></div><div class="skel-line w90"></div><div class="skel-line w50"></div><div class="skel-line w40"></div></div></div>`;
+  }
+  return `<div class="feed-skeleton">${cards}</div>`;
+}
 async function loadProducts() {
+  if (currentPage === 1) $('#feedGrid').innerHTML = skeletonHTML(8);
   let url = `/api/products?cat=${encodeURIComponent(currentCat)}&page=${currentPage}&q=${encodeURIComponent(currentQ)}`;
   const r = await fetch(url);
   const data = await r.json();
@@ -136,7 +144,7 @@ async function loadProducts() {
   $('#feedCount').textContent = `共 ${data.total} 件 · 第 ${data.page}/${data.totalPages} 页`;
 
   if (!items.length) {
-    $('#feedGrid').innerHTML = '<div class="empty">暂无商品，去后台添加一个吧～</div>';
+    $('#feedGrid').innerHTML = '<div class="feed-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7h18M3 12h18M3 17h12"/></svg><p>暂无商品</p><small>去后台添加数字商品，或换个分类看看～</small></div>';
   } else {
     $('#feedGrid').innerHTML = items.map((p, i) => {
       const tone = (TONE[p.category_slug] || TONE.ai).tone;
@@ -285,6 +293,7 @@ $('#bannerZone').addEventListener('pointerup', resetBanner);
         currentQ = e.target.value.trim();
         currentPage = 1;
         loadProducts();
+        window.scrollTo({ top: ($('#feedShell').offsetTop || 0) - 80, behavior: 'smooth' });
         // 同步另一个搜索框
         const other = sel === '#headerSearch' ? $('#mobileSearch') : $('#headerSearch');
         if (other && other.value !== e.target.value) other.value = e.target.value;

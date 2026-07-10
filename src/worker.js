@@ -509,6 +509,94 @@ async function requireAdmin(request, env) {
   return admin;
 }
 
+// 机器调用鉴权：独立 API_KEY（x-api-key 头），与后台账号密码隔离，专供 AI 批量运营
+async function requireMachine(request, env) {
+  if (!env.AI_API_KEY) return null;
+  const key = request.headers.get('x-api-key') || request.headers.get('X-Api-Key');
+  if (!key) return null;
+  // 常量时间比较，避免时序侧信道
+  const a = enc.encode(key), b = enc.encode(env.AI_API_KEY);
+  if (a.length !== b.length) return null;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0 ? { machine: true } : null;
+}
+
+// ---------------- 机器批量接口（AI 运营入口）----------------
+async function handleMachine(request, env, url, method, path) {
+  const machine = await requireMachine(request, env);
+  if (!machine) return jsonErr('未授权（缺少或错误的 x-api-key）', 401);
+
+  // 批量创建商品
+  let m = path.match(/^\/api\/machine\/products\/bulk$/);
+  if (m && method === 'POST') {
+    let b; try { b = await request.json(); } catch { return jsonErr('请求体格式错误'); }
+    const list = Array.isArray(b) ? b : (b.products || []);
+    if (!list.length) return jsonErr('商品数组为空');
+    if (list.length > 200) return jsonErr('单次最多 200 个商品');
+    const ids = [];
+    for (const it of list) {
+      if (!it.name) continue;
+      // 解析分类：支持 slug 或 name
+      let categoryId = null;
+      if (it.category_slug || it.category) {
+        const cat = await first(env, 'SELECT id FROM categories WHERE slug=? OR name=?', it.category_slug || it.category, it.category_slug || it.category);
+        categoryId = cat ? cat.id : null;
+      }
+      const slug = it.slug || ('p' + Date.now() + randHex(3));
+      const id = await insertId(
+        env,
+        `INSERT INTO products (category_id,name,slug,subtitle,description,cover_image,price,status,delivery_type,fixed_content,stock_mode,stock,min_buy,max_buy,sort,purchase_note,created_at,updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        categoryId, it.name, slug, it.subtitle || '', it.description || '',
+        it.cover_image || '', parseFloat(it.price || 0), it.status === 0 ? 0 : 1,
+        it.delivery_type || 'CARD_AUTO', it.fixed_content || '', it.stock_mode || 'FINITE',
+        parseInt(it.stock || 0, 10), parseInt(it.min_buy || 1, 10), parseInt(it.max_buy || 1, 10),
+        parseInt(it.sort || 0, 10), it.purchase_note || '', nowSec(), nowSec()
+      );
+      ids.push(id);
+    }
+    return json({ ok: true, created: ids.length, ids });
+  }
+
+  // 批量导入卡密到指定商品
+  m = path.match(/^\/api\/machine\/products\/(\d+)\/keys$/);
+  if (m && method === 'POST') {
+    let b; try { b = await request.json(); } catch { return jsonErr('请求体格式错误'); }
+    const pid = m[1];
+    const product = await first(env, 'SELECT * FROM products WHERE id=?', pid);
+    if (!product) return jsonErr('商品不存在', 404);
+    let lines = [];
+    if (Array.isArray(b.keys)) lines = b.keys.map(String).map(s => s.trim()).filter(Boolean);
+    else if (typeof b.keys === 'string') lines = b.keys.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    if (!lines.length) return jsonErr('没有可导入的卡密');
+    if (lines.length > 5000) return jsonErr('单次最多 5000 条卡密');
+    const batch = b.batch_no || ('m-' + randHex(6));
+    for (const line of lines) {
+      await run(env, 'INSERT INTO cards (product_id, content, status, batch_no, created_at) VALUES (?,?,0,?,?)', pid, line, batch, nowSec());
+    }
+    if (product.stock_mode === 'FINITE') {
+      const cc = await first(env, 'SELECT COUNT(*) AS n FROM cards WHERE product_id=? AND status=0', pid);
+      await run(env, 'UPDATE products SET stock=? WHERE id=?', cc.n, pid);
+    }
+    return json({ ok: true, imported: lines.length, batch });
+  }
+
+  // 整类清空（商品 + 卡密）——按分类 slug
+  m = path.match(/^\/api\/machine\/category\/([\w-]+)$/);
+  if (m && method === 'DELETE') {
+    const slug = m[1];
+    const cat = await first(env, 'SELECT id FROM categories WHERE slug=?', slug);
+    if (!cat) return jsonErr('分类不存在', 404);
+    const prods = await all(env, 'SELECT id FROM products WHERE category_id=?', cat.id);
+    for (const p of prods) await run(env, 'DELETE FROM cards WHERE product_id=?', p.id);
+    const info = await run(env, 'DELETE FROM products WHERE category_id=?', cat.id);
+    return json({ ok: true, deletedProducts: prods.length });
+  }
+
+  return jsonErr('未知机器接口', 404);
+}
+
 // ---------- 发货逻辑 ----------
 // 从卡池里挑 need 张未售卡（纯函数，便于测试）
 export function pickCards(cards, need) {
@@ -899,6 +987,11 @@ async function handleApi(request, env, ctx) {
   if (path === '/api/payments/bepusdt/notify' && method === 'POST') {
     return await handleUsdtNotify(env, request);
   }
+
+  // ---- 机器批量接口（AI 运营入口，x-api-key 鉴权）----
+  if (path.startsWith('/api/machine/')) {
+    return await handleMachine(request, env, url, method, path);
+  }
   // ---- 公开：获取 USDT 收款信息（success 页面展示用）----
   if (path === '/api/pay/usdt/info' && method === 'GET') {
     const orderNo = url.searchParams.get('order') || '';
@@ -1193,12 +1286,18 @@ async function handleApi(request, env, ctx) {
     return json({ ok: true });
   }
 
-  // 修改管理员密码
+  // 修改管理员密码（需校验旧密码，防止会话被盗后任意改密）
   if (path === '/api/admin/password' && method === 'PUT') {
     let b; try { b = await request.json(); } catch { return jsonErr('请求体格式错误'); }
-    if (!b.password || b.password.length < 6) return jsonErr('密码至少 6 位');
-    const ph = await hashPassword(env.AUTH_SECRET, admin.username, b.password);
-    await run(env, 'UPDATE admins SET password_hash=? WHERE id=?', ph, admin.id);
+    if (!b.old_password) return jsonErr('请输入当前密码');
+    const cur = await first(env, 'SELECT * FROM admins WHERE id=?', admin.id);
+    if (!cur) return jsonErr('管理员不存在', 401);
+    const okOld = await verifyPassword(env.AUTH_SECRET, cur.username, b.old_password, cur.password_hash);
+    if (!okOld) return jsonErr('当前密码不正确', 401);
+    if (!b.password || b.password.length < 6) return jsonErr('新密码至少 6 位');
+    if (b.password === b.old_password) return jsonErr('新密码不能与当前密码相同');
+    const ph = await hashPassword(env.AUTH_SECRET, cur.username, b.password);
+    await run(env, 'UPDATE admins SET password_hash=? WHERE id=?', ph, cur.id);
     return json({ ok: true });
   }
 
