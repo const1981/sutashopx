@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BU31 商城 · 管理后台</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- 登录 -->
+<div class="admin-login" id="loginView">
+  <div class="login-card">
+    <h2>BU31 商城后台</h2>
+    <p>默认账号 admin / admin123456，登录后请立即在「设置」修改密码</p>
+    <div class="field"><label>账号</label><input id="loginUser" placeholder="admin" autocomplete="username"></div>
+    <div class="field"><label>密码</label><input id="loginPass" type="password" placeholder="admin123456" autocomplete="current-password"></div>
+    <button class="btn btn-primary" id="loginBtn" style="width:100%;padding:11px;justify-content:center;">登录</button>
+    <a class="btn" href="/" style="width:100%;margin-top:10px;justify-content:center;">返回首页</a>
+  </div>
+</div>
+
+<!-- 后台主体 -->
+<div class="admin-shell hidden" id="adminView">
+  <aside class="admin-side">
+    <div class="brand"><div class="brand-logo">B</div><div class="brand-name"><b>BU31 后台</b></div></div>
+    <nav class="admin-nav" id="adminNav">
+      <button data-tab="overview" class="active">📊 概览</button>
+      <button data-tab="products">🛍️ 商品管理</button>
+      <button data-tab="orders">📦 订单管理</button>
+      <button data-tab="banners">🖼️ 幻灯片</button>
+      <button data-tab="gateways">💰 支付配置</button>
+      <button data-tab="categories">🗂️ 分类管理</button>
+      <button data-tab="settings">⚙️ 站点设置</button>
+      <button class="spacer" id="logoutBtn">退出登录</button>
+    </nav>
+  </aside>
+  <main class="admin-main">
+    <div class="admin-head"><h1 id="adminTitle">概览</h1><span id="adminUser" style="font-size:13px;color:var(--color-ink-soft);"></span></div>
+    <section class="admin-panel active" id="panel-overview"></section>
+    <section class="admin-panel" id="panel-products"></section>
+    <section class="admin-panel" id="panel-orders"></section>
+    <section class="admin-panel" id="panel-banners"></section>
+    <section class="admin-panel" id="panel-gateways"></section>
+    <section class="admin-panel" id="panel-categories"></section>
+    <section class="admin-panel" id="panel-settings"></section>
+  </main>
+</div>
+
+<!-- 通用 Modal -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal-card" id="modalCard">
+    <div class="modal-head"><h3 id="modalTitle">标题</h3><button class="modal-close" id="modalClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fbfaf7">
+<title>BU31 商城 · 精选数字好物</title>
+<meta name="description" content="BU31 商城 - AI 前沿、工具软件、创业项目、素材资源的精选数字商品，支付后自动发货">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- ============== HEADER ============== -->
+<header class="site-header">
+  <div class="shell desktop-shell">
+    <a class="brand" href="/">
+      <div class="brand-logo">B</div>
+      <div class="brand-name"><b id="brandName">BU31 商城</b><small>AI · 工具 · 项目 · 素材</small></div>
+    </a>
+    <nav class="header-tabs" id="headerTabs"></nav>
+    <div class="header-actions">
+      <a class="btn" href="/admin.html">后台</a>
+      <button class="icon-btn" id="themeToggle" title="切换主题" aria-label="切换主题">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="shell mobile-shell">
+    <button class="hamburger" id="hamburger" aria-label="菜单"><span></span><span></span><span></span></button>
+    <a class="brand" href="/"><div class="brand-logo">B</div><div class="brand-name"><b>BU31 商城</b></div></a>
+    <button class="icon-btn" id="themeToggleMobile" aria-label="切换主题"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+  </div>
+</header>
+
+<!-- ============== 抽屉 ============== -->
+<div class="drawer-mask" id="drawerMask"></div>
+<aside class="drawer-panel" id="drawerPanel">
+  <div class="drawer-head"><div class="brand-logo">B</div><div class="brand-name"><b>BU31 商城</b><small>AI · 工具 · 项目 · 素材</small></div></div>
+  <nav class="drawer-tabs" id="drawerTabs"></nav>
+  <div class="drawer-section"><a class="drawer-tab" href="/admin.html">管理后台 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></a></div>
+</aside>
+
+<!-- ============== MAIN ============== -->
+<main>
+<div class="shell">
+  <!-- ① Banner -->
+  <section class="carousel-shell" aria-label="推荐">
+    <div class="banner-zone" id="bannerZone">
+      <div class="banner-track" id="bannerTrack"></div>
+      <button class="banner-arrow prev" id="bannerPrev" aria-label="上一张"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg></button>
+      <button class="banner-arrow next" id="bannerNext" aria-label="下一张"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg></button>
+      <div class="banner-dots" id="bannerDots"></div>
+    </div>
+  </section>
+
+  <!-- ② 公告 -->
+  <section class="notice-summary" aria-label="公告">
+    <div class="notice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 0-7 7c0 3-1 4-2 5h18c-1-1-2-2-2-5a7 7 0 0 0-7-7zM9 19a3 3 0 0 0 6 0"/></svg>公告</div>
+    <div class="notice-viewport"><div class="notice-track" id="noticeTrack"></div></div>
+  </section>
+
+  <!-- ③ 分类导航 -->
+  <section class="category-quick-switch" id="categoryNav"></section>
+
+  <!-- ④ 商品列表 -->
+  <section class="feed-shell" id="feedShell">
+    <div class="feed-head">
+      <div class="feed-title"><div class="accent-line"></div><h2 id="feedTitle">全部商品</h2><small id="feedCount"></small></div>
+      <div class="feed-tools">
+        <div class="feed-sort" id="feedSort">
+          <button class="active" data-sort="default">默认</button>
+          <button data-sort="price_asc">价格↑</button>
+          <button data-sort="price_desc">价格↓</button>
+        </div>
+      </div>
+    </div>
+    <div class="feed-grid" id="feedGrid"></div>
+    <div class="feed-pagination" id="feedPagination"></div>
+  </section>
+
+  <!-- ⑤ 关于 -->
+  <section class="about-brand">
+    <div class="about-card"><div class="about-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></div><h4>关于本站</h4><p>精选数字好物</p></div>
+    <div class="about-card"><div class="about-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.5 8.5 0 0 1-12.2 7.6L3 21l1.9-5.8A8.5 8.5 0 1 1 21 11.5z"/></svg></div><h4>自动发货</h4><p>支付后卡密秒到</p></div>
+    <div class="about-card"><div class="about-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7v6c0 5 4 9 10 9s10-4 10-9V7L12 2z"/><path d="M9 12l2 2 4-4"/></svg></div><h4>正品保障</h4><p>售后无忧</p></div>
+    <div class="about-card"><div class="about-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></div><h4>联系客服</h4><p id="footContact">微信 shidai616</p></div>
+  </section>
+</div>
+</main>
+
+<footer class="site-footer">
+  <div class="shell">
+    <div class="brand"><div class="brand-logo">B</div><div class="brand-name"><b>BU31 商城</b></div></div>
+    <div id="footerText">© 2026 BU31 商城 · 汇聚优质数字资源</div>
+    <div style="margin-top:6px;"><a href="#" id="backTop">回到顶部 ↑</a></div>
+  </div>
+</footer>
+
+<!-- ============== 商品详情 / 购买 Modal ============== -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal-card">
+    <div class="modal-head"><h3 id="modalTitle">商品详情</h3><button class="modal-close" id="modalClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/store.js"></script>
+</body>
+</html>

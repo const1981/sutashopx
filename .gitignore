@@ -1,0 +1,35 @@
+# 依赖与构建产物
+node_modules/
+dist/
+.wrangler/
+
+# 本地数据库（保留 schema.sql/seed.sql 作建表脚本，忽略本地 sqlite）
+*.sqlite
+*.sqlite-journal
+*.db
+
+# 日志
+*.log
+npm-debug.log*
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 无关的源文件（BU31 导航站原型，非本商城代码）
+bu31.html
+*.png
+!public/**/*.png
+
+# 环境变量 / 密钥占位（wrangler secret 已托管，不入库）
+.dev.vars
+.env
+.env.*
+wrangler.toml.local
+
+# 编辑器
+.vscode/
+.idea/
+
+# 记忆与工具目录
+.workbuddy/

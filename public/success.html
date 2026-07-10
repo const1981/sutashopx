@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>支付结果 · BU31 商城</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="shell desktop-shell">
+    <a class="brand" href="/"><div class="brand-logo">B</div><div class="brand-name"><b>BU31 商城</b><small>支付结果</small></div></a>
+    <div class="header-actions"><a class="btn" href="/">返回首页</a></div>
+  </div>
+</header>
+
+<div class="success-wrap">
+  <div class="success-icon" id="statusIcon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+  </div>
+  <h1 id="statusTitle">处理中…</h1>
+  <p id="statusDesc" style="color:var(--color-ink-soft);margin-top:8px;">正在确认支付状态</p>
+
+  <div id="demoPay" class="hidden" style="margin-top:24px;">
+    <button class="btn btn-primary" id="demoBtn" style="padding:12px 30px;font-size:15px;">模拟支付成功</button>
+    <p style="font-size:12px;color:var(--color-ink-soft);margin-top:10px;">（演示模式：未接入真实支付，点此模拟支付完成）</p>
+  </div>
+
+  <div id="cryptoPay" class="hidden success-card" style="margin-top:24px;">
+    <h3 style="margin-bottom:4px;">请向以下地址支付 <b id="cryptoAmount"></b></h3>
+    <p style="font-size:13px;color:var(--color-ink-soft);margin-bottom:14px;">
+      链：<b id="cryptoChain"></b> · 币种：<b id="cryptoCur"></b>
+    </p>
+    <div id="cryptoQr" style="display:flex;justify-content:center;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:14px;">
+      <code id="cryptoAddr" style="background:var(--color-surface-soft);padding:8px 12px;border-radius:8px;font-size:12px;word-break:break-all;"></code>
+      <button class="mini-btn" id="copyAddr">复制</button>
+    </div>
+    <p style="font-size:12px;color:var(--color-ink-soft);">请按金额精确转账（含小数）。转账后点击下方「我已支付」等待系统确认；若已配置 BEpusdt 网关，到账将自动发货。</p>
+    <div style="margin-top:14px;display:flex;gap:10px;justify-content:center;">
+      <button class="btn btn-primary" id="paidBtn">我已支付</button>
+    </div>
+  </div>
+
+  <div class="success-card hidden" id="resultCard">
+    <h3 style="margin-bottom:6px;" id="prodName"></h3>
+    <div id="orderMeta" style="font-size:13px;color:var(--color-ink-soft);margin-bottom:8px;"></div>
+    <div id="keysArea"></div>
+    <div id="noteArea" style="font-size:13px;color:var(--color-accent-warm);margin-top:8px;"></div>
+    <div style="margin-top:18px;display:flex;gap:10px;">
+      <button class="btn" id="copyAll">复制全部卡密</button>
+      <a class="btn btn-primary" href="/">继续逛逛</a>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/js/success.js"></script>
+</body>
+</html>
