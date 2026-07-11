@@ -523,6 +523,22 @@ async function requireMachine(request, env) {
   return diff === 0 ? { machine: true } : null;
 }
 
+// 按 ref 解析商品：数字ID / 分类slug+商品slug / 商品slug / 商品名（免记数字ID）
+async function resolveProductByRef(env, ref) {
+  if (!ref) return null;
+  if (/^\d+$/.test(String(ref))) return await first(env, 'SELECT * FROM products WHERE id=?', ref);
+  const parts = String(ref).split('/');
+  const prodRef = parts[parts.length - 1];
+  const catRef = parts.length > 1 ? parts[0] : null;
+  if (catRef) {
+    const r = await first(env,
+      `SELECT p.* FROM products p JOIN categories c ON c.id=p.category_id WHERE (p.slug=? OR p.name=?) AND c.slug=?`,
+      prodRef, prodRef, catRef);
+    if (r) return r;
+  }
+  return await first(env, 'SELECT * FROM products WHERE slug=? OR name=?', prodRef, prodRef);
+}
+
 // ---------------- 机器批量接口（AI 运营入口）----------------
 async function handleMachine(request, env, url, method, path) {
   const machine = await requireMachine(request, env);
@@ -593,6 +609,31 @@ async function handleMachine(request, env, url, method, path) {
     for (const p of prods) await run(env, 'DELETE FROM cards WHERE product_id=?', p.id);
     const info = await run(env, 'DELETE FROM products WHERE category_id=?', cat.id);
     return json({ ok: true, deletedProducts: prods.length });
+  }
+
+  // 批量导入卡密（支持按「分类slug/商品slug或名」定位，免记数字ID）
+  if (path === '/api/machine/cards/import' && method === 'POST') {
+    let b; try { b = await request.json(); } catch { return jsonErr('请求体格式错误'); }
+    let ref = b.product_ref;
+    if (!ref && (b.category_slug || b.product_slug || b.name)) {
+      ref = (b.category_slug || '') + '/' + (b.product_slug || b.name || '');
+    }
+    const product = await resolveProductByRef(env, ref);
+    if (!product) return jsonErr('商品不存在（可用 product_ref="分类slug/商品slug" 或 商品名定位）', 404);
+    let lines = [];
+    if (Array.isArray(b.keys)) lines = b.keys.map(String).map(s => s.trim()).filter(Boolean);
+    else if (typeof b.keys === 'string') lines = b.keys.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    if (!lines.length) return jsonErr('没有可导入的卡密');
+    if (lines.length > 5000) return jsonErr('单次最多 5000 条卡密');
+    const batch = b.batch_no || ('m-' + randHex(6));
+    for (const line of lines) {
+      await run(env, 'INSERT INTO cards (product_id, content, status, batch_no, created_at) VALUES (?,?,0,?,?)', product.id, line, batch, nowSec());
+    }
+    if (product.stock_mode === 'FINITE') {
+      const cc = await first(env, 'SELECT COUNT(*) AS n FROM cards WHERE product_id=? AND status=0', product.id);
+      await run(env, 'UPDATE products SET stock=? WHERE id=?', cc.n, product.id);
+    }
+    return json({ ok: true, imported: lines.length, product_id: product.id, batch });
   }
 
   return jsonErr('未知机器接口', 404);
@@ -1292,6 +1333,34 @@ async function handleApi(request, env, ctx) {
     }
     return json({ ok: true, imported: lines.length, batch });
   }
+
+  // 后台一键生成卡密（tiaomama 风格：前缀 + 零填充自增数字 + 后缀），零外部 key
+  const gm = path.match(/^\/api\/admin\/products\/(\d+)\/generate-keys$/);
+  if (gm && method === 'POST') {
+    let b;
+    try { b = await request.json(); } catch { return jsonErr('请求体格式错误'); }
+    const count = Math.min(Math.max(parseInt(b.count || 0, 10), 1), 5000);
+    const prefix = String(b.prefix || '');
+    const suffix = String(b.suffix || '');
+    const start = Math.max(parseInt(b.start || 1, 10), 0);
+    const digits = Math.min(Math.max(parseInt(b.digits || 7, 10), 1), 12);
+    const batch = b.batch_no || ('gen-' + randHex(6));
+    const pid = gm[1];
+    const lines = [];
+    for (let i = 0; i < count; i++) {
+      lines.push(prefix + String(start + i).padStart(digits, '0') + suffix);
+    }
+    for (const line of lines) {
+      await run(env, 'INSERT INTO cards (product_id, content, status, batch_no, created_at) VALUES (?,?,0,?,?)', pid, line, batch, nowSec());
+    }
+    const product = await first(env, 'SELECT * FROM products WHERE id=?', pid);
+    if (product && product.stock_mode === 'FINITE') {
+      const cc = await first(env, 'SELECT COUNT(*) AS n FROM cards WHERE product_id=? AND status=0', pid);
+      await run(env, 'UPDATE products SET stock=? WHERE id=?', cc.n, pid);
+    }
+    return json({ ok: true, generated: lines.length, batch, sample: lines.slice(0, 3) });
+  }
+
   // 查看卡密列表
   if (m && method === 'GET') {
     const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));

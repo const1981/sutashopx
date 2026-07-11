@@ -404,5 +404,31 @@ d = await jr(r);
 ok('GET 分类详情 200', r.status === 200, r.status);
 ok('分类详情含 name 字段', d.data && d.data.name === '详情回归分类', d.data);
 
+// 23. 一键生成卡密（零外部 key）+ 机器接口按分类/商品名定位（免记数字 ID）
+// 23.1 后台生成卡密：tiaomama 风格 前缀 + 零填充自增数字 + 后缀
+r = await worker.fetch(req('POST', '/api/admin/products/1/generate-keys', { count: 10, prefix: 'SN-', start: 1, digits: 5, suffix: '' }, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('后台生成卡密成功(10张)', r.status === 200 && d.data.generated === 10, d.data);
+ok('生成样本首张=SN-00001', d.data && d.data.sample && d.data.sample[0] === 'SN-00001', d.data && d.data.sample);
+// 生成后卡密列表应包含 SN-00001 与 SN-00010（验证真正入库且自增正确）
+r = await worker.fetch(req('GET', '/api/admin/products/1/keys', null, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('生成卡密已入库(列表含 SN-00001)', d.data.items && d.data.items.some(c => c.content === 'SN-00001'), d.data.items && d.data.items.length);
+ok('生成序列正确含 SN-00010', d.data.items && d.data.items.some(c => c.content === 'SN-00010'), d.data.items && d.data.items.length);
+
+// 23.2 机器接口按「分类slug/商品slug」导入（免记数字 ID）
+r = await worker.fetch(mreq('POST', '/api/machine/cards/import', { product_ref: 'ai/chatgpt-vip-month', keys: ['REF-A1', 'REF-A2'] }), env, ctx);
+d = await jr(r);
+ok('按 分类slug/商品slug 导入成功(2张,定位到商品1)', r.status === 200 && d.data.imported === 2 && d.data.product_id === 1, d.data);
+
+// 23.3 机器接口按「商品名」导入（用种子商品真实全名）
+r = await worker.fetch(mreq('POST', '/api/machine/cards/import', { product_ref: 'ChatGPT 镜像站会员卡（月卡）', keys: ['REF-B1'] }), env, ctx);
+d = await jr(r);
+ok('按商品名导入成功(定位到商品1)', r.status === 200 && d.data.imported === 1 && d.data.product_id === 1, d.data);
+
+// 23.4 机器接口错误 ref 被拒(404)
+r = await worker.fetch(mreq('POST', '/api/machine/cards/import', { product_ref: 'no/such-product', keys: ['X'] }), env, ctx);
+ok('错误 product_ref 导入被拒(404)', r.status === 404, r.status);
+
 console.log(`\n集成测试结果：通过 ${pass} / 失败 ${fail}`);
 process.exit(fail ? 1 : 0);

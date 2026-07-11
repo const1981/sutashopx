@@ -259,11 +259,32 @@ async function openKeys(id) {
     <td><button class="mini-btn danger" data-del="${c.id}">删除</button></td></tr>`).join('')
     : '<tr><td colspan="4" class="empty">还没有卡密</td></tr>';
   openModal('卡密管理 · ' + (prod.ok ? prod.data.name : '#' + id), `
-    <div class="field"><label>批量导入卡密（每行一条，可粘贴多行）</label>
+    <div class="field"><label>① 一键生成卡密（tiaomama 风格：前缀 + 自增数字 + 后缀，零外部 key）</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px;">
+        <input id="g_count" type="number" min="1" value="10" style="width:84px;" placeholder="数量">
+        <input id="g_prefix" placeholder="前缀(如 SN-)" style="width:108px;">
+        <input id="g_start" type="number" min="0" value="1" style="width:72px;" placeholder="起始">
+        <input id="g_digits" type="number" min="1" max="12" value="7" style="width:64px;" placeholder="位数">
+        <input id="g_suffix" placeholder="后缀" style="width:84px;">
+      </div>
+    </div>
+    <button class="btn btn-primary" id="g_btn" style="width:100%;justify-content:center;padding:11px;margin-bottom:16px;">⚡ 生成卡密</button>
+    <div class="field"><label>② 或批量粘贴导入卡密（每行一条，可粘贴多行）</label>
       <textarea id="k_import" placeholder="KEY-001&#10;KEY-002&#10;KEY-003"></textarea></div>
-    <div class="field"><label>批次号（可选）</label><input id="k_batch" placeholder="batch-001"></div>
+    <div class="field"><label>批次号（可选，生成/导入共用）</label><input id="k_batch" placeholder="batch-001"></div>
     <button class="btn btn-primary" id="k_import_btn" style="width:100%;justify-content:center;padding:11px;margin-bottom:16px;">导入卡密</button>
     <div class="table-card"><table class="data"><tr><th>卡密</th><th>状态</th><th>批次</th><th>操作</th></tr>${rows}</table></div>`, true);
+  $('#g_btn').onclick = async () => {
+    const count = parseInt($('#g_count').value || '0', 10);
+    if (!count || count < 1) { toast('请填写生成数量'); return; }
+    const r = await api('/api/admin/products/' + id + '/generate-keys', 'POST', {
+      count, prefix: $('#g_prefix').value.trim(), suffix: $('#g_suffix').value.trim(),
+      start: parseInt($('#g_start').value || '1', 10), digits: parseInt($('#g_digits').value || '7', 10),
+      batch_no: $('#k_batch').value.trim()
+    });
+    if (r.ok) { toast('已生成 ' + r.data.generated + ' 张（示例：' + (r.data.sample || []).join('、') + '）'); openKeys(id); renderProducts(); }
+    else toast(r.data.error || '生成失败');
+  };
   $('#k_import_btn').onclick = async () => {
     const keys = $('#k_import').value;
     if (!keys.trim()) { toast('请输入卡密'); return; }
@@ -654,21 +675,23 @@ async function renderMachine() {
   $('#panel-machine').innerHTML = `
     <div class="table-card" style="padding:22px;">
       <p style="color:var(--color-ink-soft);font-size:13px;line-height:1.7;margin-bottom:16px;">
-        此面板供 <b>AI / 脚本</b> 批量运营使用。调用接口需在请求头带 <code>x-api-key</code>（在 Cloudflare 后台设置的 <code>AI_API_KEY</code> 变量），与后台账号密码隔离。<br>
+        <b>日常生成/导入卡密不用碰这个面板</b>：在「商品管理」点商品行的「卡密」按钮，里面有「⚡ 生成卡密」和粘贴导入，走后台登录态、<b>零外部 key</b>。<br>
+        本面板仅供 <b>AI / 脚本</b> 远程批量运营。调用接口需在请求头带 <code>x-api-key</code>（Cloudflare 后台设置的 <code>AI_API_KEY</code> 变量），与后台账号密码隔离。<br>
         接口：<br>
-        • <code>POST /api/machine/products/bulk</code> —— 批量建商品（JSON 数组，每项含 name/price/category_slug/delivery_type 等；price 单位为元/美元，与后台一致会自动×100 存分）<br>
-        • <code>POST /api/machine/products/{id}/keys</code> —— 批量导入卡密（{ "keys": ["k1","k2"] } 或换行字符串）<br>
+        • <code>POST /api/machine/products/bulk</code> —— 批量建商品（JSON 数组，含 name/price/category_slug/delivery_type；price 单位为元/美元，自动×100 存分）<br>
+        • <code>POST /api/machine/cards/import</code> —— 批量导入卡密，<b>免记数字 ID</b>，用 <code>product_ref="分类slug/商品slug"</code> 或商品名定位：<code>{ "product_ref":"ai/chatgpt-plus", "keys":["k1","k2"] }</code><br>
+        • <code>POST /api/machine/products/{id}/keys</code> —— 旧接口，按数字 ID 导入（仍可用）<br>
         • <code>DELETE /api/machine/category/{slug}</code> —— 整类清空（商品+卡密）
       </p>
       <div class="field"><label>API Key (x-api-key)</label><input id="m_key" type="password" placeholder="在 Cloudflare 后台设置的 AI_API_KEY"></div>
       <div class="field"><label>操作</label>
         <select id="m_op">
           <option value="products">批量建商品</option>
-          <option value="keys">导入卡密到商品</option>
+          <option value="keys">导入卡密(按分类/商品名)</option>
           <option value="clearcat">整类清空</option>
         </select>
       </div>
-      <div class="field" id="m_pid_field" style="display:none;"><label>商品 ID（导入卡密时填）</label><input id="m_pid" type="number" placeholder="商品数字 ID"></div>
+      <div class="field" id="m_pid_field" style="display:none;"><label>product_ref（分类slug/商品slug 或商品名，免记数字ID）</label><input id="m_pid" placeholder="如 ai/chatgpt-plus 或 ChatGPT Plus"></div>
       <div class="field" id="m_slug_field"><label>分类 slug（整类清空时填，如 ai）</label><input id="m_slug" placeholder="ai"></div>
       <div class="field"><label>JSON 内容</label>
         <textarea id="m_body" style="min-height:200px;font-family:monospace;" placeholder='批量建商品示例：\n[\n  {"name":"ChatGPT  Plus","price":19.9,"category_slug":"ai","delivery_type":"CARD_AUTO"}\n]'></textarea>
@@ -692,11 +715,12 @@ async function renderMachine() {
     try {
       if (opv === 'products') { path = '/api/machine/products/bulk'; body = JSON.parse($('#m_body').value); }
       else if (opv === 'keys') {
-        const pid = $('#m_pid').value.trim();
-        if (!pid) { toast('请填写商品 ID'); return; }
-        path = '/api/machine/products/' + pid + '/keys';
+        const ref = $('#m_pid').value.trim();
+        if (!ref) { toast('请填写 product_ref（分类slug/商品slug 或商品名）'); return; }
+        path = '/api/machine/cards/import';
         const raw = $('#m_body').value.trim();
-        try { body = JSON.parse(raw); } catch { body = { keys: raw }; }
+        let keys; try { keys = JSON.parse(raw); } catch { keys = { keys: raw }; }
+        body = (keys && Array.isArray(keys.keys)) ? { product_ref: ref, keys: keys.keys } : { product_ref: ref, keys: (typeof keys === 'string' ? keys : (keys.keys || raw)) };
       } else { path = '/api/machine/category/' + $('#m_slug').value.trim(); method = 'DELETE'; }
     } catch (e) { toast('JSON 解析失败：' + e.message); return; }
     const out = $('#m_out'); out.style.display = 'block'; out.textContent = '请求中…';
