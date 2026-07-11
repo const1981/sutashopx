@@ -26,6 +26,7 @@
         <div class="search-pop" id="searchPop">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
           <input id="headerSearch" type="text" placeholder="搜索商品…">
+          <button class="search-clear" id="searchClear" aria-label="清除搜索" title="清除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
         </div>
       </div>
       <button class="icon-btn" id="themeToggle" title="切换主题" aria-label="切换主题">
@@ -36,10 +37,11 @@
   <div class="shell mobile-shell">
     <button class="hamburger" id="hamburger" aria-label="菜单"><span></span><span></span><span></span></button>
     <a class="brand" href="/"><div class="brand-logo">B</div><div class="brand-name"><b>BU31 商城</b></div></a>
-    <div class="hsearch mobile">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-      <input id="mobileSearch" type="text" placeholder="搜索商品…">
-    </div>
+      <div class="hsearch mobile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="mobileSearch" type="text" placeholder="搜索商品…">
+        <button class="search-clear" id="mobileClear" aria-label="清除搜索" title="清除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
     <button class="icon-btn" id="themeToggleMobile" aria-label="切换主题"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
   </div>
 </header>
@@ -73,7 +75,7 @@
   <!-- ④ 商品列表 -->
   <section class="feed-shell" id="feedShell">
     <div class="feed-head">
-      <div class="feed-title"><div class="accent-line"></div><h2 id="feedTitle">全部商品</h2><small id="feedCount"></small></div>
+      <div class="feed-title"><div class="accent-line"></div><h2 id="feedTitle">全部商品</h2><small id="feedCount"></small><button id="clearSearchBtn" class="clear-search-btn" hidden>清除搜索</button></div>
       <div class="feed-tools">
         <div class="feed-sort" id="feedSort">
           <button class="active" data-sort="default">默认</button>

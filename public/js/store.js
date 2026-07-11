@@ -140,8 +140,10 @@ async function loadProducts() {
   if (sort === 'price_desc') items = [...items].sort((a, b) => b.price - a.price);
 
   const catName = currentCat === 'all' ? '全部商品' : (CATS.find(c => c.slug === currentCat) || {}).name || '商品';
-  $('#feedTitle').textContent = catName;
+  $('#feedTitle').textContent = currentQ ? `搜索：“${currentQ}”` : catName;
   $('#feedCount').textContent = `共 ${data.total} 件 · 第 ${data.page}/${data.totalPages} 页`;
+  const csb = $('#clearSearchBtn');
+  if (csb) csb.hidden = !currentQ;
 
   if (!items.length) {
     $('#feedGrid').innerHTML = '<div class="feed-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7h18M3 12h18M3 17h12"/></svg><p>暂无商品</p><small>去后台添加数字商品，或换个分类看看～</small></div>';
@@ -290,7 +292,9 @@ $('#bannerZone').addEventListener('pointerup', resetBanner);
     if (!el) return;
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
-        currentQ = e.target.value.trim();
+        const v = e.target.value.trim();
+        if (!v) { clearSearch(); return; }
+        currentQ = v;
         currentPage = 1;
         loadProducts();
         window.scrollTo({ top: ($('#feedShell').offsetTop || 0) - 80, behavior: 'smooth' });
@@ -314,6 +318,23 @@ $('#bannerZone').addEventListener('pointerup', resetBanner);
     document.addEventListener('click', () => sPop.classList.remove('open'));
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') sPop.classList.remove('open'); });
   }
+
+  // 清除搜索，回到全部商品
+  function clearSearch() {
+    currentQ = '';
+    currentPage = 1;
+    const a = $('#headerSearch'), b = $('#mobileSearch');
+    if (a) a.value = '';
+    if (b) b.value = '';
+    if (sPop) sPop.classList.remove('open');
+    loadProducts();
+  }
+  const scBtn = $('#searchClear');
+  if (scBtn) scBtn.onclick = clearSearch;
+  const mcBtn = $('#mobileClear');
+  if (mcBtn) mcBtn.onclick = clearSearch;
+  const fsb = $('#clearSearchBtn');
+  if (fsb) fsb.onclick = clearSearch;
 })();
 
 // ---------------- 启动 ----------------
