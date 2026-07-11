@@ -550,7 +550,7 @@ async function handleMachine(request, env, url, method, path) {
         `INSERT INTO products (category_id,name,slug,subtitle,description,cover_image,price,status,delivery_type,fixed_content,stock_mode,stock,min_buy,max_buy,sort,purchase_note,created_at,updated_at)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         categoryId, it.name, slug, it.subtitle || '', it.description || '',
-        it.cover_image || '', parseFloat(it.price || 0), it.status === 0 ? 0 : 1,
+        it.cover_image || '', Math.round(parseFloat(it.price || 0) * 100), it.status === 0 ? 0 : 1,
         it.delivery_type || 'CARD_AUTO', it.fixed_content || '', it.stock_mode || 'FINITE',
         parseInt(it.stock || 0, 10), parseInt(it.min_buy || 1, 10), parseInt(it.max_buy || 1, 10),
         parseInt(it.sort || 0, 10), it.purchase_note || '', nowSec(), nowSec()
@@ -1261,6 +1261,14 @@ async function handleApi(request, env, ctx) {
     await run(env, 'DELETE FROM products WHERE id=?', m[1]);
     return json({ ok: true });
   }
+  // 按 ID 取商品详情（后台编辑表单用；注意此 m 在下方会被 keys 正则覆盖，必须放前面）
+  if (m && method === 'GET') {
+    const p = await first(env, 'SELECT * FROM products WHERE id=?', m[1]);
+    if (!p) return jsonErr('商品不存在', 404);
+    const availableCards = p.delivery_type === 'CARD_AUTO'
+      ? (await first(env, 'SELECT COUNT(*) AS n FROM cards WHERE product_id=? AND status=0', p.id)).n : 0;
+    return json({ ...p, availableCards });
+  }
 
   // 批量导入卡密
   m = path.match(/^\/api\/admin\/products\/(\d+)\/keys$/);
@@ -1478,6 +1486,12 @@ async function handleApi(request, env, ctx) {
   if (m && method === 'DELETE') {
     await run(env, 'DELETE FROM categories WHERE id=?', m[1]);
     return json({ ok: true });
+  }
+  // 按 ID 取分类详情（后台编辑表单用；此 m 在下方网关正则前有效）
+  if (m && method === 'GET') {
+    const c = await first(env, 'SELECT * FROM categories WHERE id=?', m[1]);
+    if (!c) return jsonErr('分类不存在', 404);
+    return json({ ...c });
   }
 
   // 支付网关配置

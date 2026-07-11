@@ -382,5 +382,27 @@ d = await jr(r);
 await worker.fetch(req('POST', '/api/pay/demo', { orderNo: d.data.orderNo }), env, ctx);
 ok('webhook 为空时不发飞书', feishuCalls === 0, feishuCalls);
 
+// 22. 后台「按 ID 取详情」回归（之前 GET /api/admin/products/{id} 与 /categories/{id} 缺失，导致编辑表单空白）
+// 22.1 商品详情
+r = await worker.fetch(mreq('POST', '/api/machine/products/bulk', [
+  { name: '详情回归商品', price: 9.9, category_slug: 'ai', delivery_type: 'CARD_AUTO' }
+]), env, ctx);
+d = await jr(r);
+ok('机器批量建商品(详情回归)成功', r.status === 200 && d.data.created === 1, d.data);
+const detPid = d.data.ids[0];
+r = await worker.fetch(req('GET', '/api/admin/products/' + detPid, null, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('GET 商品详情 200', r.status === 200, r.status);
+ok('商品详情含 name 字段', d.data && d.data.name === '详情回归商品', d.data);
+ok('商品详情 price 已×100 存分(990)', d.data && d.data.price === 990, d.data && d.data.price);
+// 22.2 分类详情
+r = await worker.fetch(req('POST', '/api/admin/categories', { name: '详情回归分类', slug: 'detcat', description: 't' }, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+const detCid = d.data.id;
+r = await worker.fetch(req('GET', '/api/admin/categories/' + detCid, null, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('GET 分类详情 200', r.status === 200, r.status);
+ok('分类详情含 name 字段', d.data && d.data.name === '详情回归分类', d.data);
+
 console.log(`\n集成测试结果：通过 ${pass} / 失败 ${fail}`);
 process.exit(fail ? 1 : 0);

@@ -22,7 +22,8 @@
 
 <!-- 后台主体 -->
 <div class="admin-shell hidden" id="adminView">
-  <aside class="admin-side">
+  <div class="admin-mask" id="adminMask"></div>
+  <aside class="admin-side" id="adminSide">
     <div class="brand"><div class="brand-logo">B</div><div class="brand-name"><b>BU31 后台</b></div></div>
     <nav class="admin-nav" id="adminNav">
       <button data-tab="overview" class="active">📊 概览</button>
@@ -37,7 +38,13 @@
     </nav>
   </aside>
   <main class="admin-main">
-    <div class="admin-head"><h1 id="adminTitle">概览</h1><span id="adminUser" style="font-size:13px;color:var(--color-ink-soft);"></span></div>
+    <div class="admin-head">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+        <button class="admin-menu-btn" id="adminMenuBtn" aria-label="打开菜单"><span></span><span></span><span></span></button>
+        <h1 id="adminTitle">概览</h1>
+      </div>
+      <span id="adminUser" style="font-size:13px;color:var(--color-ink-soft);"></span>
+    </div>
     <section class="admin-panel active" id="panel-overview"></section>
     <section class="admin-panel" id="panel-products"></section>
     <section class="admin-panel" id="panel-orders"></section>

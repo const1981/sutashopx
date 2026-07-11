@@ -103,7 +103,11 @@ function switchTab(tab) {
   if (tab === 'machine') renderMachine();
   if (tab === 'settings') renderSettings();
 }
-$('#adminNav').onclick = (e) => { const b = e.target.closest('button[data-tab]'); if (b) switchTab(b.dataset.tab); };
+$('#adminNav').onclick = (e) => { const b = e.target.closest('button[data-tab]'); if (b) { switchTab(b.dataset.tab); if (window.innerWidth <= 760) closeAdminSide(); } };
+function openAdminSide() { $('#adminSide').classList.add('open'); $('#adminMask').classList.add('open'); }
+function closeAdminSide() { $('#adminSide').classList.remove('open'); $('#adminMask').classList.remove('open'); }
+$('#adminMenuBtn').onclick = () => $('#adminSide').classList.contains('open') ? closeAdminSide() : openAdminSide();
+$('#adminMask').onclick = closeAdminSide;
 
 // ---------- 概览 ----------
 async function renderOverview() {
@@ -652,7 +656,7 @@ async function renderMachine() {
       <p style="color:var(--color-ink-soft);font-size:13px;line-height:1.7;margin-bottom:16px;">
         此面板供 <b>AI / 脚本</b> 批量运营使用。调用接口需在请求头带 <code>x-api-key</code>（在 Cloudflare 后台设置的 <code>AI_API_KEY</code> 变量），与后台账号密码隔离。<br>
         接口：<br>
-        • <code>POST /api/machine/products/bulk</code> —— 批量建商品（JSON 数组，每项含 name/price/category_slug/delivery_type 等）<br>
+        • <code>POST /api/machine/products/bulk</code> —— 批量建商品（JSON 数组，每项含 name/price/category_slug/delivery_type 等；price 单位为元/美元，与后台一致会自动×100 存分）<br>
         • <code>POST /api/machine/products/{id}/keys</code> —— 批量导入卡密（{ "keys": ["k1","k2"] } 或换行字符串）<br>
         • <code>DELETE /api/machine/category/{slug}</code> —— 整类清空（商品+卡密）
       </p>
