@@ -360,6 +360,9 @@ r = await worker.fetch(req('POST', '/api/pay/demo', { orderNo: oF1 }), env, ctx)
 ok('支付成功触发飞书通知', feishuCalls >= 1, feishuCalls);
 ok('飞书消息为 interactive 卡片', lastFeishuBody && lastFeishuBody.msg_type === 'interactive', lastFeishuBody);
 ok('飞书卡片含订单号', lastFeishuBody && lastFeishuBody.card && JSON.stringify(lastFeishuBody.card).includes(oF1), lastFeishuBody);
+// 防止回归：飞书 div.fields[].text 必须是对象 {tag:'lark_md',content}（之前写成字符串导致 code=11246 卡片解析失败）
+const f0 = lastFeishuBody && lastFeishuBody.card && lastFeishuBody.card.elements && lastFeishuBody.card.elements[0].fields && lastFeishuBody.card.elements[0].fields[0].text;
+ok('飞书卡片 fields.text 为对象 {tag:lark_md,content}', f0 && typeof f0 === 'object' && f0.tag === 'lark_md' && typeof f0.content === 'string', f0);
 
 // 21.2 配置 secret，验证加签
 feishuCalls = 0; lastFeishuBody = null;

@@ -679,12 +679,12 @@ async function sendFeishu(env, order, provider, res) {
       header: { title: { tag: 'plain_text', content: title } },
       elements: [
         { tag: 'div', fields: [
-          { is_short: true, text: `**订单号**\n${order.order_no}` },
-          { is_short: true, text: `**金额**\n¥${amount}` },
-          { is_short: true, text: `**商品**\n${order.product_name}` },
-          { is_short: true, text: `**数量**\n×${order.quantity}` },
-          { is_short: true, text: `**支付方式**\n${providerTxt}` },
-          { is_short: true, text: `**发货**\n${deliverTxt}` },
+          { is_short: true, text: { tag: 'lark_md', content: `**订单号**\n${order.order_no}` } },
+          { is_short: true, text: { tag: 'lark_md', content: `**金额**\n¥${amount}` } },
+          { is_short: true, text: { tag: 'lark_md', content: `**商品**\n${order.product_name}` } },
+          { is_short: true, text: { tag: 'lark_md', content: `**数量**\n×${order.quantity}` } },
+          { is_short: true, text: { tag: 'lark_md', content: `**支付方式**\n${providerTxt}` } },
+          { is_short: true, text: { tag: 'lark_md', content: `**发货**\n${deliverTxt}` } },
         ] },
         { tag: 'note', elements: [{ tag: 'plain_text', content: `BU31 商城 · ${new Date().toLocaleString('zh-CN')}` }] }
       ]
