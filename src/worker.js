@@ -653,14 +653,15 @@ async function deliverOrder(env, order) {
 // ---------- 飞书通知 ----------
 // 订单支付成功后推送飞书卡片。webhook 为空则不发；失败绝不阻断主流程。
 async function sendFeishu(env, order, provider, res) {
+  const result = { sent: false, reason: null, httpStatus: null, feishuCode: null, feishuMsg: null, raw: null };
   try {
     const s = await first(env, 'SELECT * FROM site_settings WHERE id=1');
-    if (!s || !s.feishu_webhook) return;
+    if (!s || !s.feishu_webhook) { result.reason = 'no_webhook'; return result; }
     const webhook = s.feishu_webhook;
     // 仅允许飞书官方域名，防止 SSRF
     if (!/^https:\/\/(open\.feishu\.cn|open\.larksuite\.com)\//.test(webhook)) {
-      console.warn('飞书 webhook 域名不合法，跳过通知');
-      return;
+      result.reason = 'bad_domain';
+      return result;
     }
     const secret = s.feishu_secret || '';
     const amount = ((order.amount || 0) / 100).toFixed(2);
@@ -701,11 +702,27 @@ async function sendFeishu(env, order, provider, res) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!resp.ok) console.warn('飞书通知返回非 200:', resp.status);
+    result.httpStatus = resp.status;
+    const txt = await resp.text().catch(() => '');
+    result.raw = txt.slice(0, 300);
+    if (!resp.ok) { result.reason = 'http_not_200'; return result; }
+    try {
+      const j = JSON.parse(txt);
+      result.feishuCode = j.code;
+      result.feishuMsg = j.msg;
+      result.sent = (j.code === 0);
+      if (j.code !== 0) result.reason = 'feishu_rejected';
+    } catch {
+      // HTTP 200 但非标准 JSON，视为已送达
+      result.sent = true;
+    }
   } catch (e) {
     // 通知失败绝不阻断主流程（支付/发货已成功）
-    console.error('sendFeishu failed:', e && e.message ? e.message : e);
+    result.reason = 'exception';
+    result.error = e && e.message ? e.message : String(e);
+    console.error('sendFeishu failed:', result.error);
   }
+  return result;
 }
 
 async function markPaid(env, order, provider, paymentOrderNo) {
@@ -1353,8 +1370,9 @@ async function handleApi(request, env, ctx) {
     const s = await first(env, 'SELECT feishu_webhook, feishu_secret FROM site_settings WHERE id=1');
     if (!s || !s.feishu_webhook) return jsonErr('请先在站点设置里填写飞书机器人 Webhook', 400);
     const fakeOrder = { order_no: 'TEST-' + Date.now(), product_name: '飞书通知测试', amount: 0, quantity: 1 };
-    await sendFeishu(env, fakeOrder, 'test', { keys: [], note: '这是一条测试消息', status: 'DELIVERED' });
-    return json({ ok: true, message: '测试消息已发送，请到飞书群查看是否收到' });
+    const r = await sendFeishu(env, fakeOrder, 'test', { keys: [], note: '这是一条测试消息', status: 'DELIVERED' });
+    if (r.sent) return json({ ok: true, message: '测试消息已发送，请到飞书群查看是否收到' });
+    return json({ ok: false, error: '飞书未确认收到消息', detail: r }, 502);
   }
 
   // 修改管理员密码（需校验旧密码，防止会话被盗后任意改密）

@@ -747,7 +747,18 @@ async function renderSettings() {
   };
   $('#s_feishu_test').onclick = async () => {
     const r2 = await api('/api/admin/feishu/test', 'POST');
-    if (r2.ok) toast('测试消息已发送，请到飞书群查看'); else toast(r2.data.error || '发送失败');
+    if (r2.ok) { toast('测试消息已发送，请到飞书群查看'); return; }
+    const d = r2.data || {};
+    let msg = d.error || '发送失败';
+    const det = d.detail;
+    if (det) {
+      if (det.feishuCode != null) msg = '飞书拒绝：code=' + det.feishuCode + '，' + (det.feishuMsg || '');
+      else if (det.reason === 'no_webhook') msg = '未填写飞书 Webhook';
+      else if (det.reason === 'bad_domain') msg = 'Webhook 域名不合法（必须 open.feishu.cn / open.larksuite.com）';
+      else if (det.reason === 'http_not_200') msg = '飞书返回 HTTP ' + det.httpStatus;
+      else if (det.reason === 'exception') msg = '请求异常：' + (det.error || '');
+    }
+    toast(msg);
   };
   $('#s_pwd_btn').onclick = async () => {
     const old = $('#s_pwd_old').value;
