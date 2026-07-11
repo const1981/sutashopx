@@ -1372,7 +1372,14 @@ async function handleApi(request, env, ctx) {
     const fakeOrder = { order_no: 'TEST-' + Date.now(), product_name: '飞书通知测试', amount: 0, quantity: 1 };
     const r = await sendFeishu(env, fakeOrder, 'test', { keys: [], note: '这是一条测试消息', status: 'DELIVERED' });
     if (r.sent) return json({ ok: true, message: '测试消息已发送，请到飞书群查看是否收到' });
-    return json({ ok: false, error: '飞书未确认收到消息', detail: r }, 502);
+    let why = '飞书未确认收到消息';
+    if (r.feishuCode != null) why = `飞书拒绝：code=${r.feishuCode}，${r.feishuMsg || '(无说明)'}`;
+    else if (r.reason === 'http_not_200') why = `飞书返回 HTTP ${r.httpStatus}（${r.raw || '无响应体'}）`;
+    else if (r.reason === 'bad_domain') why = 'Webhook 域名不合法（必须是 open.feishu.cn 或 open.larksuite.com）';
+    else if (r.reason === 'no_webhook') why = '未填写飞书 Webhook';
+    else if (r.reason === 'exception') why = '请求飞书异常：' + (r.error || '未知');
+    else if (r.raw) why = '飞书原始返回：' + r.raw;
+    return json({ ok: false, error: why, detail: r }, 502);
   }
 
   // 修改管理员密码（需校验旧密码，防止会话被盗后任意改密）
