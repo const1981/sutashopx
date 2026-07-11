@@ -1,4 +1,6 @@
-// 飞书链路端到端验证（自测用，不进 git 长期保留）
+// 诊断工具：用线上库已填的飞书 webhook 真发一条到飞书，验证卡片格式/加签是否被飞书接受。
+// 用法：CFAT=<cloudflare-token> node test/feishu_live.mjs  （会真实向飞书群推送一条测试卡片）
+// 注意：依赖线上 D1 的 site_settings，仅用于部署后验证，勿频繁运行。
 // 1) 交叉验证加签算法：Web Crypto(同 worker) vs Node 官方 crypto
 // 2) 用线上库已填的 webhook 真发一条到飞书，打印真实返回 code，定位安全设置问题
 import { createHmac } from 'node:crypto';
