@@ -144,5 +144,7 @@ CREATE TABLE IF NOT EXISTS site_settings (
   support_contact TEXT,
   footer_text   TEXT,
   order_notice  TEXT,
-  currency      TEXT NOT NULL DEFAULT 'usd'
+  currency      TEXT NOT NULL DEFAULT 'usd',
+  feishu_webhook TEXT,                    -- 飞书自定义机器人 Webhook（非空即启用新订单通知）
+  feishu_secret  TEXT                     -- 飞书机器人签名密钥（可选，开启加签时填）
 );

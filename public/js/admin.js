@@ -727,6 +727,13 @@ async function renderSettings() {
         <option value="cny" ${s.currency === 'cny' ? 'selected' : ''}>人民币 CNY (¥)</option></select></div>
       <button class="btn btn-primary" id="s_save" style="width:100%;justify-content:center;padding:11px;margin-top:8px;">保存设置</button>
       <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--color-line);">
+        <h3 style="font-size:14px;margin-bottom:10px;">🔔 飞书通知（新订单支付成功时推送）</h3>
+        <div class="field"><label>飞书机器人 Webhook</label><input id="s_feishu_url" value="${s.feishu_webhook || ''}" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"></div>
+        <div class="field"><label>签名密钥 Secret（可选，机器人开启加签时填）</label><input id="s_feishu_secret" type="password" value="${s.feishu_secret || ''}" placeholder="飞书机器人安全设置里的签名密钥"></div>
+        <button class="btn" id="s_feishu_test" style="width:100%;justify-content:center;padding:11px;margin-top:4px;">发送测试消息</button>
+        <p style="font-size:12px;color:var(--color-ink-soft);margin-top:10px;">在飞书群添加「自定义机器人」后复制 Webhook 地址填入；若机器人开启了「签名校验」，需一并填 Secret。保存后，每笔支付成功的订单都会推送到该群。</p>
+      </div>
+      <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--color-line);">
         <h3 style="font-size:14px;margin-bottom:10px;">修改管理员密码</h3>
         <div class="field"><label>当前密码</label><input id="s_pwd_old" type="password" placeholder="请输入当前密码"></div>
         <div class="field"><label>新密码</label><input id="s_pwd" type="password" placeholder="至少 6 位"></div>
@@ -734,9 +741,13 @@ async function renderSettings() {
       </div>
     </div>`;
   $('#s_save').onclick = async () => {
-    const payload = { site_name: $('#s_name').value, subtitle: $('#s_sub').value, notice: $('#s_notice').value, support_contact: $('#s_contact').value, footer_text: $('#s_footer').value, order_notice: $('#s_order').value, currency: $('#s_currency').value };
+    const payload = { site_name: $('#s_name').value, subtitle: $('#s_sub').value, notice: $('#s_notice').value, support_contact: $('#s_contact').value, footer_text: $('#s_footer').value, order_notice: $('#s_order').value, currency: $('#s_currency').value, feishu_webhook: $('#s_feishu_url').value.trim(), feishu_secret: $('#s_feishu_secret').value };
     const r2 = await api('/api/admin/settings', 'PUT', payload);
     if (r2.ok) toast('设置已保存'); else toast(r2.data.error || '保存失败');
+  };
+  $('#s_feishu_test').onclick = async () => {
+    const r2 = await api('/api/admin/feishu/test', 'POST');
+    if (r2.ok) toast('测试消息已发送，请到飞书群查看'); else toast(r2.data.error || '发送失败');
   };
   $('#s_pwd_btn').onclick = async () => {
     const old = $('#s_pwd_old').value;

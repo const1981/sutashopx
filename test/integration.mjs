@@ -64,7 +64,9 @@ const env = {
   STRIPE_CURRENCY: 'usd',
 };
 
-// ---- mock 外部 fetch（用于 BEpusdt 等网关）----
+// ---- mock 外部 fetch（用于 BEpusdt 等网关 + 飞书）----
+let feishuCalls = 0;
+let lastFeishuBody = null;
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async function (input, init) {
   const url = typeof input === 'string' ? input : (input.url || input.href || String(input));
@@ -74,6 +76,11 @@ globalThis.fetch = async function (input, init) {
       message: 'ok',
       data: { payment_url: 'https://bepusdt.example.com/pay/mock-123', trade_id: 'TBE123' }
     }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }
+  if (url.includes('open.feishu.cn')) {
+    feishuCalls++;
+    try { lastFeishuBody = JSON.parse(init && init.body ? init.body : '{}'); } catch (e) {}
+    return new Response(JSON.stringify({ code: 0, msg: 'success' }), { status: 200, headers: { 'content-type': 'application/json' } });
   }
   return originalFetch(input, init);
 };
@@ -310,15 +317,19 @@ r = await worker.fetch(req('PUT', '/api/admin/password', { old_password: newPwd,
 ok('改回默认密码成功', r.status === 200, r.status);
 
 // 20. 机器批量接口（x-api-key 鉴权 + 批量建商品/导入卡密/整类清空）
+// 注意：用独立临时分类 mtest，避免误删种子分类(ai 即 category_id=1，含演示商品 1/2)
 const MKEY = 'test-machine-key-123';
 const mreq = (method, path, body) => req(method, path, body, { 'x-api-key': MKEY });
 r = await worker.fetch(req('POST', '/api/machine/products/bulk', [{ name: 'x' }]), env, ctx);
 ok('无 x-api-key 被拒(401)', r.status === 401, r.status);
 r = await worker.fetch(req('POST', '/api/machine/products/bulk', [{ name: 'x' }], { 'x-api-key': 'wrong' }), env, ctx);
 ok('错误 x-api-key 被拒(401)', r.status === 401, r.status);
+// 先建一个临时分类（后台接口），供机器接口批量投放并整类清空
+r = await worker.fetch(req('POST', '/api/admin/categories', { name: '临时机批类', slug: 'mtest', description: 'test' }, { Authorization: 'Bearer ' + token }), env, ctx);
+ok('创建临时分类成功', r.status === 200);
 r = await worker.fetch(mreq('POST', '/api/machine/products/bulk', [
-  { name: '机批量商品A', price: 9.9, category_slug: 'ai', delivery_type: 'CARD_AUTO' },
-  { name: '机批量商品B', price: 0, category_slug: 'ai', delivery_type: 'FIXED', fixed_content: 'CONTENT-B' }
+  { name: '机批量商品A', price: 9.9, category_slug: 'mtest', delivery_type: 'CARD_AUTO' },
+  { name: '机批量商品B', price: 0, category_slug: 'mtest', delivery_type: 'FIXED', fixed_content: 'CONTENT-B' }
 ]), env, ctx);
 d = await jr(r);
 ok('批量建商品成功', r.status === 200 && d.data.created === 2, d.data);
@@ -326,12 +337,47 @@ const newPid = d.data.ids[0];
 r = await worker.fetch(mreq('POST', '/api/machine/products/' + newPid + '/keys', { keys: ['K1', 'K2', 'K3'] }), env, ctx);
 d = await jr(r);
 ok('批量导入卡密成功(3条)', r.status === 200 && d.data.imported === 3, d.data);
-r = await worker.fetch(req('GET', '/api/products?cat=ai', null, {}), env, ctx);
+r = await worker.fetch(req('GET', '/api/products?cat=mtest', null, {}), env, ctx);
 d = await jr(r);
 ok('新商品出现在列表', d.data.items.some(it => it.id === newPid), d.data.items.length);
-r = await worker.fetch(mreq('DELETE', '/api/machine/category/ai'), env, ctx);
+r = await worker.fetch(mreq('DELETE', '/api/machine/category/mtest'), env, ctx);
 d = await jr(r);
 ok('整类清空成功(删除商品数>0)', r.status === 200 && d.data.deletedProducts > 0, d.data);
+// 确认种子演示商品 1 仍存活（后面 21 飞书测试依赖它）
+r = await worker.fetch(req('GET', '/api/products/1'), env, ctx);
+d = await jr(r);
+ok('种子商品 1 未被整类清空误删', r.status === 200 && d.data.product, d.data);
+
+// 21. 飞书通知（支付成功推送）
+// 21.1 配置 webhook（无 secret），演示支付应触发飞书
+r = await worker.fetch(req('PUT', '/api/admin/settings', { feishu_webhook: 'https://open.feishu.cn/open-apis/bot/v2/hook/test', feishu_secret: '' }, { Authorization: 'Bearer ' + token }), env, ctx);
+ok('保存飞书 webhook 配置成功', r.status === 200);
+feishuCalls = 0; lastFeishuBody = null;
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1 }), env, ctx);
+d = await jr(r);
+const oF1 = d.data.orderNo;
+r = await worker.fetch(req('POST', '/api/pay/demo', { orderNo: oF1 }), env, ctx);
+ok('支付成功触发飞书通知', feishuCalls >= 1, feishuCalls);
+ok('飞书消息为 interactive 卡片', lastFeishuBody && lastFeishuBody.msg_type === 'interactive', lastFeishuBody);
+ok('飞书卡片含订单号', lastFeishuBody && lastFeishuBody.card && JSON.stringify(lastFeishuBody.card).includes(oF1), lastFeishuBody);
+
+// 21.2 配置 secret，验证加签
+feishuCalls = 0; lastFeishuBody = null;
+r = await worker.fetch(req('PUT', '/api/admin/settings', { feishu_webhook: 'https://open.feishu.cn/open-apis/bot/v2/hook/test', feishu_secret: 'mysecret' }, { Authorization: 'Bearer ' + token }), env, ctx);
+ok('保存飞书 secret 配置成功', r.status === 200);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1 }), env, ctx);
+d = await jr(r);
+await worker.fetch(req('POST', '/api/pay/demo', { orderNo: d.data.orderNo }), env, ctx);
+ok('带 secret 时飞书消息含 sign + timestamp', lastFeishuBody && lastFeishuBody.sign && lastFeishuBody.timestamp, lastFeishuBody);
+
+// 21.3 webhook 清空则不发
+feishuCalls = 0;
+r = await worker.fetch(req('PUT', '/api/admin/settings', { feishu_webhook: '', feishu_secret: '' }, { Authorization: 'Bearer ' + token }), env, ctx);
+ok('清空飞书 webhook 配置成功', r.status === 200);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1 }), env, ctx);
+d = await jr(r);
+await worker.fetch(req('POST', '/api/pay/demo', { orderNo: d.data.orderNo }), env, ctx);
+ok('webhook 为空时不发飞书', feishuCalls === 0, feishuCalls);
 
 console.log(`\n集成测试结果：通过 ${pass} / 失败 ${fail}`);
 process.exit(fail ? 1 : 0);

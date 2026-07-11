@@ -649,13 +649,73 @@ async function deliverOrder(env, order) {
   return { keys, note, status };
 }
 
+// ---------- 飞书通知 ----------
+// 订单支付成功后推送飞书卡片。webhook 为空则不发；失败绝不阻断主流程。
+async function sendFeishu(env, order, provider, res) {
+  try {
+    const s = await first(env, 'SELECT * FROM site_settings WHERE id=1');
+    if (!s || !s.feishu_webhook) return;
+    const webhook = s.feishu_webhook;
+    // 仅允许飞书官方域名，防止 SSRF
+    if (!/^https:\/\/(open\.feishu\.cn|open\.larksuite\.com)\//.test(webhook)) {
+      console.warn('飞书 webhook 域名不合法，跳过通知');
+      return;
+    }
+    const secret = s.feishu_secret || '';
+    const amount = ((order.amount || 0) / 100).toFixed(2);
+    const providerMap = { demo: '演示支付', test: '测试', usdt: 'USDT', stripe: 'Stripe', alipay: '支付宝', wechat: '微信', epay: '易支付' };
+    const providerTxt = providerMap[provider] || provider || '未知';
+    let deliverTxt;
+    if (res && res.keys && res.keys.length) deliverTxt = `已发 ${res.keys.length} 张卡密/内容`;
+    else if (res && res.status === 'PAID') deliverTxt = '待人工发货';
+    else deliverTxt = (res && res.note) || '-';
+
+    const title = provider === 'demo' ? '🔔 新订单支付成功（演示）'
+      : (provider === 'test' ? '🔔 飞书通知测试' : '💰 新订单支付成功');
+    const card = {
+      config: { wide_screen_mode: true },
+      header: { title: { tag: 'plain_text', content: title } },
+      elements: [
+        { tag: 'div', fields: [
+          { is_short: true, text: `**订单号**\n${order.order_no}` },
+          { is_short: true, text: `**金额**\n¥${amount}` },
+          { is_short: true, text: `**商品**\n${order.product_name}` },
+          { is_short: true, text: `**数量**\n×${order.quantity}` },
+          { is_short: true, text: `**支付方式**\n${providerTxt}` },
+          { is_short: true, text: `**发货**\n${deliverTxt}` },
+        ] },
+        { tag: 'note', elements: [{ tag: 'plain_text', content: `BU31 商城 · ${new Date().toLocaleString('zh-CN')}` }] }
+      ]
+    };
+    const body = { msg_type: 'interactive', card };
+    if (secret) {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+      const sigBuf = await crypto.subtle.sign('HMAC', key, enc.encode(`${timestamp}\n${secret}`));
+      body.timestamp = String(timestamp);
+      body.sign = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
+    }
+    const resp = await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) console.warn('飞书通知返回非 200:', resp.status);
+  } catch (e) {
+    // 通知失败绝不阻断主流程（支付/发货已成功）
+    console.error('sendFeishu failed:', e && e.message ? e.message : e);
+  }
+}
+
 async function markPaid(env, order, provider, paymentOrderNo) {
   await run(
     env,
     "UPDATE orders SET status='PAID', payment_provider=?, payment_order_no=?, paid_at=? WHERE id=?",
     provider, paymentOrderNo, nowSec(), order.id
   );
-  return deliverOrder(env, order);
+  const res = await deliverOrder(env, order);
+  await sendFeishu(env, order, provider, res);
+  return res;
 }
 
 // ---------- 支付适配器 ----------
@@ -1279,11 +1339,21 @@ async function handleApi(request, env, ctx) {
     try { b = await request.json(); } catch { return jsonErr('请求体格式错误'); }
     await run(
       env,
-      `UPDATE site_settings SET site_name=?,subtitle=?,notice=?,support_contact=?,footer_text=?,order_notice=?,currency=? WHERE id=1`,
+      `UPDATE site_settings SET site_name=?,subtitle=?,notice=?,support_contact=?,footer_text=?,order_notice=?,currency=?,feishu_webhook=?,feishu_secret=? WHERE id=1`,
       b.site_name || 'BU31 商城', b.subtitle || '', b.notice || '', b.support_contact || '',
-      b.footer_text || '', b.order_notice || '',       b.currency || 'usd'
+      b.footer_text || '', b.order_notice || '', b.currency || 'usd',
+      b.feishu_webhook || '', b.feishu_secret || ''
     );
     return json({ ok: true });
+  }
+
+  // 飞书通知测试（用假订单发一条，验证 webhook 是否通）
+  if (path === '/api/admin/feishu/test' && method === 'POST') {
+    const s = await first(env, 'SELECT feishu_webhook, feishu_secret FROM site_settings WHERE id=1');
+    if (!s || !s.feishu_webhook) return jsonErr('请先在站点设置里填写飞书机器人 Webhook', 400);
+    const fakeOrder = { order_no: 'TEST-' + Date.now(), product_name: '飞书通知测试', amount: 0, quantity: 1 };
+    await sendFeishu(env, fakeOrder, 'test', { keys: [], note: '这是一条测试消息', status: 'DELIVERED' });
+    return json({ ok: true, message: '测试消息已发送，请到飞书群查看是否收到' });
   }
 
   // 修改管理员密码（需校验旧密码，防止会话被盗后任意改密）
