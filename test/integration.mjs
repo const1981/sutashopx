@@ -430,5 +430,14 @@ ok('按商品名导入成功(定位到商品1)', r.status === 200 && d.data.impo
 r = await worker.fetch(mreq('POST', '/api/machine/cards/import', { product_ref: 'no/such-product', keys: ['X'] }), env, ctx);
 ok('错误 product_ref 导入被拒(404)', r.status === 404, r.status);
 
+// 24. 后台「AI 接口」页配置端点：返回 base_url / key_set / 完整 key / 4 接口清单
+r = await worker.fetch(req('GET', '/api/admin/machine-config', null, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('AI接口配置端点 200', r.status === 200, d);
+ok('返回 base_url', d.data && d.data.base_url && d.data.base_url.startsWith('https://'), d.data && d.data.base_url);
+ok('key_set=true(测试环境已设 AI_API_KEY)', d.data && d.data.key_set === true, d.data);
+ok('返回完整 key(登录态可见)', d.data && d.data.key_full === 'test-machine-key-123', d.data && d.data.key_full);
+ok('返回 4 个接口清单', d.data && Array.isArray(d.data.endpoints) && d.data.endpoints.length === 4, d.data && d.data.endpoints);
+
 console.log(`\n集成测试结果：通过 ${pass} / 失败 ${fail}`);
 process.exit(fail ? 1 : 0);

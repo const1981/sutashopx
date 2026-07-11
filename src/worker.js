@@ -1237,6 +1237,23 @@ async function handleApi(request, env, ctx) {
     });
   }
 
+  // AI 运营接口配置（后台「AI 接口」页用）——只返回是否设置 + base URL，不泄露明文 key
+  if (path === '/api/admin/machine-config' && method === 'GET') {
+    const origin = (url.origin && url.origin.startsWith('http')) ? url.origin : (env.BASE_URL || 'https://bu31-shop.constlee.workers.dev');
+    return json({
+      base_url: origin,
+      key_set: !!env.AI_API_KEY,
+      key_full: env.AI_API_KEY || '',
+      key_hint: env.AI_API_KEY ? (env.AI_API_KEY.slice(0, 6) + '…' + env.AI_API_KEY.slice(-4)) : '',
+      endpoints: [
+        { method: 'POST', path: '/api/machine/products/bulk', desc: '批量添加商品（JSON 数组，price 单位元）' },
+        { method: 'POST', path: '/api/machine/cards/import', desc: '导入卡密，product_ref="分类slug/商品slug" 或商品名定位' },
+        { method: 'POST', path: '/api/machine/products/{id}/keys', desc: '旧接口：按数字 ID 导卡密（仍可用）' },
+        { method: 'DELETE', path: '/api/machine/category/{slug}', desc: '整类清空（商品+卡密）' },
+      ],
+    });
+  }
+
   // 商品列表（含下架）
   if (path === '/api/admin/products' && method === 'GET') {
     const q_ = url.searchParams.get('q') || '';

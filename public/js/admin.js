@@ -89,7 +89,7 @@ async function afterLogin() {
 }
 
 // ---------- 导航 ----------
-const TITLES = { overview: '概览', products: '商品管理', orders: '订单管理', banners: '幻灯片管理', gateways: '支付配置', categories: '分类管理', machine: '机器批量', settings: '站点设置' };
+const TITLES = { overview: '概览', products: '商品管理', orders: '订单管理', banners: '幻灯片管理', gateways: '支付配置', categories: '分类管理', machine: '机器批量', aiapi: 'AI 接口', settings: '站点设置' };
 function switchTab(tab) {
   $$('#adminNav button[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   $$('.admin-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
@@ -101,6 +101,7 @@ function switchTab(tab) {
   if (tab === 'gateways') renderGateways();
   if (tab === 'categories') renderCategories();
   if (tab === 'machine') renderMachine();
+  if (tab === 'aiapi') renderAiApi();
   if (tab === 'settings') renderSettings();
 }
 $('#adminNav').onclick = (e) => { const b = e.target.closest('button[data-tab]'); if (b) { switchTab(b.dataset.tab); if (window.innerWidth <= 760) closeAdminSide(); } };
@@ -734,6 +735,51 @@ async function renderMachine() {
       if (r.ok) { toast('执行成功'); if (opv !== 'clearcat') renderMachine(); }
       else toast(d.error || '执行失败');
     } catch (e) { out.textContent = '请求异常：' + e.message; }
+  };
+}
+
+// ---------- AI 接口（机器运营文档，内置后台）----------
+async function renderAiApi() {
+  const r = await api('/api/admin/machine-config');
+  if (!r.ok) { $('#panel-aiapi').innerHTML = '<p class="empty">加载失败</p>'; return; }
+  const c = r.data;
+  const keyLine = c.key_set
+    ? `<span class="badge badge-green">已设置</span> 当前 Key（明文仅在已设置时显示，复制给 AI 用）：<code id="aiapi_key" style="user-select:all;background:var(--color-card-2);padding:3px 8px;border-radius:6px;">${c.key_hint ? '(已设) ' + c.key_hint : '已设置'}</code><br><span style="font-size:12px;color:var(--color-ink-soft);">如需看完整 Key，去 Cloudflare → bu31-shop → Settings → Variables and Secrets 查看/修改。</span>`
+    : `<span class="badge badge-orange">未设置</span> 接口当前处于锁定状态（任何调用都会返回 401）。请去 <b>Cloudflare → bu31-shop → Settings → Variables and Secrets → Add</b>，Type 选 <b>Secret</b>，变量名填 <b>AI_API_KEY</b>，值填一个你自己定的 Key，Deploy 后此页会显示「已设置」。`;
+  const epRows = c.endpoints.map(e => `<tr><td><span class="badge ${e.method === 'DELETE' ? 'badge-gray' : 'badge-blue'}">${e.method}</span></td><td><code>${e.path}</code></td><td style="color:var(--color-ink-soft);font-size:13px;">${e.desc}</td></tr>`).join('');
+  $('#panel-aiapi').innerHTML = `
+    <div class="table-card" style="padding:22px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">
+        <button class="btn btn-primary" id="aiapi_copy" style="padding:10px 18px;">📋 一键复制发给 AI</button>
+        <span style="font-size:13px;color:var(--color-ink-soft);">把复制出的内容直接粘给你的 AI，它就能不登录后台帮你管商城。</span>
+      </div>
+      <div class="field"><label>接口根地址（Base URL）</label><code style="display:block;padding:8px 10px;background:var(--color-card-2);border-radius:8px;user-select:all;">${c.base_url}</code></div>
+      <div class="field"><label>AI_API_KEY 状态</label><div>${keyLine}</div></div>
+      <h3 style="font-size:14px;margin:18px 0 10px;">接口清单（4 个）</h3>
+      <div class="table-card" style="overflow-x:auto;"><table class="data"><tr><th>方法</th><th>路径</th><th>说明</th></tr>${epRows}</table></div>
+      <h3 style="font-size:14px;margin:18px 0 10px;">示例</h3>
+      <pre style="background:var(--color-card-2);border-radius:8px;padding:12px;overflow:auto;font-size:12px;line-height:1.6;">POST ${c.base_url}/api/machine/products/bulk
+Header: x-api-key: 你的Key
+Body: [{"name":"ChatGPT Plus 月卡","price":29.9,"category_slug":"ai","delivery_type":"CARD_AUTO"}]
+
+POST ${c.base_url}/api/machine/cards/import
+Header: x-api-key: 你的Key
+Body: {"product_ref":"ai/chatgpt-plus","keys":["KEY-001","KEY-002"]}</pre>
+      <p style="font-size:12px;color:var(--color-ink-soft);margin-top:10px;">price 直接填元（如 29.9），系统自动处理；product_ref 支持「分类slug/商品slug」或直接写商品名。</p>
+    </div>`;
+  $('#aiapi_copy').onclick = async () => {
+    const keyText = c.key_set ? (c.key_full || c.key_hint) : '(请在 Cloudflare 设置 AI_API_KEY 后查看完整 Key)';
+    const txt = `你是我的电商运营助手。我有一个卡密商城，你可通过 HTTP 接口帮我管理商品和卡密，不用登录后台。\n\n` +
+      `接口根地址：${c.base_url}\n` +
+      `每个请求带请求头：x-api-key: ${keyText}\n` +
+      `price 直接填元（如 29.9）。\n\n` +
+      `可用接口：\n` +
+      `1. 批量加商品：POST ${c.base_url}/api/machine/products/bulk （body 是商品 JSON 数组）\n` +
+      `2. 导卡密：POST ${c.base_url}/api/machine/cards/import （body 里 product_ref 用「分类slug/商品名」定位，keys 是卡密数组）\n` +
+      `3. 整类清空：DELETE ${c.base_url}/api/machine/category/{分类slug}\n\n` +
+      `当我说"帮我上架XX/导入这批卡密"时，你就调对应接口，调完把返回结果告诉我。`;
+    try { await navigator.clipboard.writeText(txt); toast('已复制到剪贴板，直接粘给 AI'); }
+    catch { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('已复制'); }
   };
 }
 
