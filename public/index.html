@@ -19,9 +19,14 @@
     </a>
     <nav class="header-tabs" id="headerTabs"></nav>
     <div class="header-actions">
-      <div class="hsearch">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <input id="headerSearch" type="text" placeholder="搜索商品…">
+      <div class="hsearch-wrap">
+        <button class="hsearch-btn" id="headerSearchBtn" aria-label="搜索" title="搜索">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        </button>
+        <div class="search-pop" id="searchPop">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="headerSearch" type="text" placeholder="搜索商品…">
+        </div>
       </div>
       <button class="icon-btn" id="themeToggle" title="切换主题" aria-label="切换主题">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>

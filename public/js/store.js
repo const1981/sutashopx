@@ -304,6 +304,16 @@ $('#bannerZone').addEventListener('pointerup', resetBanner);
   };
   bind('#headerSearch');
   bind('#mobileSearch');
+
+  // 桌面端圆形搜索按钮：点击展开/收起下拉
+  const sBtn = $('#headerSearchBtn');
+  const sPop = $('#searchPop');
+  if (sBtn && sPop) {
+    sBtn.onclick = (e) => { e.stopPropagation(); sPop.classList.toggle('open'); if (sPop.classList.contains('open')) $('#headerSearch').focus(); };
+    sPop.onclick = (e) => e.stopPropagation();
+    document.addEventListener('click', () => sPop.classList.remove('open'));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') sPop.classList.remove('open'); });
+  }
 })();
 
 // ---------------- 启动 ----------------

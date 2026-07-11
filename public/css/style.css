@@ -118,12 +118,18 @@ input,select,textarea{font:inherit;color:inherit;}
 .tab-btn:hover{color:var(--color-ink-strong);background:var(--color-surface-soft);}
 .tab-btn.active{color:#fff;background:linear-gradient(135deg,var(--color-accent-strong),var(--color-accent-cool));box-shadow:0 6px 14px #0f5d8f33;}
 .header-actions{display:flex;align-items:center;gap:8px;flex-shrink:0;}
-.hsearch{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:10px;background:var(--color-surface-soft);border:1px solid var(--color-line);color:var(--color-ink-soft);transition:all .28s var(--ease-out);}
-.hsearch:focus-within{border-color:var(--color-accent-strong);color:var(--color-accent-strong);}
-.hsearch svg{width:16px;height:16px;flex-shrink:0;}
-.hsearch input{border:none;outline:none;background:transparent;font-size:13px;color:var(--color-ink-strong);width:150px;}
-.hsearch input::placeholder{color:var(--color-ink-soft);}
-.hsearch.mobile{margin:10px 0 4px;width:100%;}
+/* 桌面端搜索：圆形按钮 + 点击展开下拉 */
+.hsearch-wrap{position:relative;display:inline-flex;align-items:center;}
+.hsearch-btn{width:38px;height:38px;border-radius:50%;background:var(--color-surface-soft);border:1px solid var(--color-line);color:var(--color-ink-mid);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .28s var(--ease-out);}
+.hsearch-btn:hover{border-color:var(--color-accent-strong);color:var(--color-accent-strong);}
+.hsearch-btn svg{width:17px;height:17px;}
+.search-pop{position:absolute;top:calc(100% + 10px);right:0;display:flex;align-items:center;gap:8px;padding:8px 12px;width:280px;border-radius:12px;background:var(--color-surface);border:1px solid var(--color-line);box-shadow:0 12px 34px rgba(0,0,0,.14);opacity:0;visibility:hidden;transform:translateY(-6px);transition:all .22s var(--ease-out);z-index:50;}
+.search-pop.open{opacity:1;visibility:visible;transform:translateY(0);}
+.search-pop svg{width:16px;height:16px;flex-shrink:0;color:var(--color-ink-soft);}
+.search-pop input{border:none;outline:none;background:transparent;font-size:13px;color:var(--color-ink-strong);width:100%;}
+.search-pop input::placeholder{color:var(--color-ink-soft);}
+/* 移动端：保持原全宽搜索框 */
+.hsearch.mobile{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:10px;background:var(--color-surface-soft);border:1px solid var(--color-line);color:var(--color-ink-soft);transition:all .28s var(--ease-out);}
 .hsearch.mobile input{width:100%;}
 .icon-btn{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--color-ink-mid);background:var(--color-surface-soft);border:1px solid var(--color-line);transition:all .28s var(--ease-out);flex-shrink:0;}
 .icon-btn:hover{color:var(--color-ink-strong);border-color:var(--color-line-strong);transform:translateY(-1px);}
