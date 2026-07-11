@@ -731,7 +731,7 @@ async function renderSettings() {
         <div class="field"><label>飞书机器人 Webhook</label><input id="s_feishu_url" value="${s.feishu_webhook || ''}" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"></div>
         <div class="field"><label>签名密钥 Secret（可选，机器人开启加签时填）</label><input id="s_feishu_secret" type="password" value="${s.feishu_secret || ''}" placeholder="飞书机器人安全设置里的签名密钥"></div>
         <button class="btn" id="s_feishu_test" style="width:100%;justify-content:center;padding:11px;margin-top:4px;">发送测试消息</button>
-        <p style="font-size:12px;color:var(--color-ink-soft);margin-top:10px;">在飞书群添加「自定义机器人」后复制 Webhook 地址填入；若机器人开启了「签名校验」，需一并填 Secret。保存后，每笔支付成功的订单都会推送到该群。</p>
+        <p style="font-size:12px;color:var(--color-ink-soft);margin-top:10px;">在飞书群添加「自定义机器人」后复制 Webhook 地址填入；若机器人开启了「签名校验」，需一并填 Secret。填好后直接点「发送测试消息」即可（会自动保存，无需先点顶部「保存」）；验证通过后再填其它设置、点顶部「保存」。每笔支付成功的订单都会推送到该群。</p>
       </div>
       <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--color-line);">
         <h3 style="font-size:14px;margin-bottom:10px;">修改管理员密码</h3>
@@ -746,19 +746,13 @@ async function renderSettings() {
     if (r2.ok) toast('设置已保存'); else toast(r2.data.error || '保存失败');
   };
   $('#s_feishu_test').onclick = async () => {
-    const r2 = await api('/api/admin/feishu/test', 'POST');
+    const webhook = ($('#s_feishu_url').value || '').trim();
+    const secret = $('#s_feishu_secret').value || '';
+    if (!webhook) { toast('请先填写飞书机器人 Webhook'); return; }
+    const r2 = await api('/api/admin/feishu/test', 'POST', { webhook, secret });
     if (r2.ok) { toast('测试消息已发送，请到飞书群查看'); return; }
-    const d = r2.data || {};
-    let msg = d.error || '发送失败';
-    const det = d.detail;
-    if (det) {
-      if (det.feishuCode != null) msg = '飞书拒绝：code=' + det.feishuCode + '，' + (det.feishuMsg || '');
-      else if (det.reason === 'no_webhook') msg = '未填写飞书 Webhook';
-      else if (det.reason === 'bad_domain') msg = 'Webhook 域名不合法（必须 open.feishu.cn / open.larksuite.com）';
-      else if (det.reason === 'http_not_200') msg = '飞书返回 HTTP ' + det.httpStatus;
-      else if (det.reason === 'exception') msg = '请求异常：' + (det.error || '');
-    }
-    toast(msg);
+    // 后端已把飞书真实错误码/原因写进 d.error，直接显示
+    toast((r2.data && r2.data.error) || '发送失败');
   };
   $('#s_pwd_btn').onclick = async () => {
     const old = $('#s_pwd_old').value;

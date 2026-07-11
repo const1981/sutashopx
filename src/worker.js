@@ -1367,14 +1367,32 @@ async function handleApi(request, env, ctx) {
 
   // 飞书通知测试（用假订单发一条，验证 webhook 是否通）
   if (path === '/api/admin/feishu/test' && method === 'POST') {
-    const s = await first(env, 'SELECT feishu_webhook, feishu_secret FROM site_settings WHERE id=1');
-    if (!s || !s.feishu_webhook) return jsonErr('请先在站点设置里填写飞书机器人 Webhook', 400);
+    let b = {};
+    try { b = await request.json(); } catch {}
+    // 优先用测试按钮传来的输入框值（无需先点顶部保存），否则读库
+    let webhook = (b.webhook || '').trim();
+    let secret = b.secret || '';
+    if (!webhook) {
+      const s = await first(env, 'SELECT feishu_webhook, feishu_secret FROM site_settings WHERE id=1');
+      webhook = (s && s.feishu_webhook) || '';
+      secret = (s && s.feishu_secret) || '';
+    }
+    if (!webhook) {
+      return jsonErr('请先填写飞书机器人 Webhook（填在上面的输入框，点“发送测试消息”即可，会自动保存，无需先点顶部保存）', 400);
+    }
+    // 写回库：测过即保存，省得再点顶部“保存”
+    await run(env, 'UPDATE site_settings SET feishu_webhook=?, feishu_secret=? WHERE id=1', webhook, secret);
     const fakeOrder = { order_no: 'TEST-' + Date.now(), product_name: '飞书通知测试', amount: 0, quantity: 1 };
     const r = await sendFeishu(env, fakeOrder, 'test', { keys: [], note: '这是一条测试消息', status: 'DELIVERED' });
     if (r.sent) return json({ ok: true, message: '测试消息已发送，请到飞书群查看是否收到' });
     let why = '飞书未确认收到消息';
-    if (r.feishuCode != null) why = `飞书拒绝：code=${r.feishuCode}，${r.feishuMsg || '(无说明)'}`;
-    else if (r.reason === 'http_not_200') why = `飞书返回 HTTP ${r.httpStatus}（${r.raw || '无响应体'}）`;
+    if (r.feishuCode != null) {
+      why = `飞书拒绝：code=${r.feishuCode}，${r.feishuMsg || '(无说明)'}`;
+      if (r.feishuCode === 19010) why += '（加签不匹配：飞书开了加签 → 后台“签名密钥”必须和飞书机器人里的一致；没开加签 → 后台“签名密钥”留空）';
+      else if (r.feishuCode === 19021) why += '（关键词不匹配：飞书开了自定义关键词，卡片标题需包含该词；建议关闭关键词或把关键词设成“通知”）';
+      else if (r.feishuCode === 19020 || r.feishuCode === 19024) why += '（Webhook 无效：机器人可能已删除，请重新复制完整地址）';
+      else if (r.feishuCode === 19011) why += '（发送太频繁，稍等几秒再试）';
+    } else if (r.reason === 'http_not_200') why = `飞书返回 HTTP ${r.httpStatus}（${r.raw || '无响应体'}）`;
     else if (r.reason === 'bad_domain') why = 'Webhook 域名不合法（必须是 open.feishu.cn 或 open.larksuite.com）';
     else if (r.reason === 'no_webhook') why = '未填写飞书 Webhook';
     else if (r.reason === 'exception') why = '请求飞书异常：' + (r.error || '未知');
