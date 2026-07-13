@@ -1,4 +1,4 @@
-# BU31 商城 · AI 运营接口使用说明
+# SutaShopX 商城 · AI 运营接口使用说明
 
 > 用途：把这份说明 + 你的 API Key 发给你的 AI，AI 就能**不登录后台**，直接帮你往商城里
 > 批量添加商品、导入卡密、清空分类。走独立 Key（`x-api-key`），跟你的后台账号密码完全隔离，
@@ -11,7 +11,7 @@
 接口默认是**锁死的**——没设 Key 之前，任何人调都返回 401。你要先设好这个 Key：
 
 1. 浏览器打开 **https://dash.cloudflare.com** 登录
-2. 左侧菜单点 **Workers & Pages** → 在列表里点 **bu31-shop**
+2. 左侧菜单点 **Workers & Pages** → 在列表里点 **sutashopx**
 3. 顶部点 **Settings（设置）** 标签
 4. 找到 **Variables and Secrets（变量与机密）** 这一块 → 点 **Add（添加）**
 5. 填写：
@@ -23,7 +23,7 @@
 **你的 Key（建议值，可自己改，务必保密）：**
 
 ```
-bu31_ai_ee994060de6e6086de3d203a5b1581572cd8e3d0e3adccb5
+sutashopx_ai_ee994060de6e6086de3d203a5b1581572cd8e3d0e3adccb5
 ```
 
 > 设完就生效了。以后想换 Key，回到这里改 Value 再 Deploy 即可，旧 Key 立刻失效。
@@ -32,7 +32,7 @@ bu31_ai_ee994060de6e6086de3d203a5b1581572cd8e3d0e3adccb5
 
 ## 二、基本信息
 
-- **接口根地址（Base URL）**：`https://bu31-shop.constlee.workers.dev`
+- **接口根地址（Base URL）**：`https://sutashopx.constlee.workers.dev`
 - **鉴权**：每个请求都要带请求头 `x-api-key: 你的Key`
 - **数据格式**：请求体和返回都是 JSON
 - **价格单位**：接口里 `price` 直接填**元/美元**（如 `29.9`），系统自动 ×100 存成分，你不用换算
@@ -99,8 +99,8 @@ Header: x-api-key: 你的Key
 你是我的电商运营助手。我有一个卡密商城，你可以通过 HTTP 接口帮我管理商品和卡密，
 不需要登录后台。规则如下：
 
-- 接口根地址：https://bu31-shop.constlee.workers.dev
-- 每个请求都要带请求头：x-api-key: bu31_ai_ee994060de6e6086de3d203a5b1581572cd8e3d0e3adccb5
+- 接口根地址：https://sutashopx.constlee.workers.dev
+- 每个请求都要带请求头：x-api-key: sutashopx_ai_ee994060de6e6086de3d203a5b1581572cd8e3d0e3adccb5
 - price 直接填元（如 29.9），系统会自动处理
 
 你能用的接口：
@@ -116,8 +116,8 @@ Header: x-api-key: 你的Key
 ## 五、快速自测（可选，用命令行验证 Key 通不通）
 
 ```bash
-curl -X POST https://bu31-shop.constlee.workers.dev/api/machine/products/bulk \
-  -H "x-api-key: bu31_ai_ee994060de6e6086de3d203a5b1581572cd8e3d0e3adccb5" \
+curl -X POST https://sutashopx.constlee.workers.dev/api/machine/products/bulk \
+  -H "x-api-key: sutashopx_ai_ee994060de6e6086de3d203a5b1581572cd8e3d0e3adccb5" \
   -H "Content-Type: application/json" \
   -d '[{"name":"接口测试商品","price":1,"category_slug":"ai","delivery_type":"MANUAL"}]'
 ```

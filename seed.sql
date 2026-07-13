@@ -1,6 +1,6 @@
 -- ============================================================
---  BU31 极简卡密商城 · 初始数据
---  用法：wrangler d1 execute bu31-shop-db --remote --file=./seed.sql
+--  SutaShopX 极简卡密商城 · 初始数据
+--  用法：wrangler d1 execute sutashopx-db --remote --file=./seed.sql
 --  管理员账号在首次访问后台时自动创建：admin / admin123456
 --  （首次登录后请务必在「设置」里修改密码）
 -- ============================================================
@@ -8,15 +8,15 @@
 -- 站点设置（固定 id=1）
 INSERT OR IGNORE INTO site_settings (id, site_name, subtitle, notice, support_contact, footer_text, order_notice, currency)
 VALUES (1,
-  'BU31 商城',
+  'SutaShopX 商城',
   'AI · 工具 · 项目 · 素材 精选数字好物',
   '🎉 全站商品支付后自动发货，卡密秒到；有问题请联系客服微信 shidai616',
   '微信：shidai616 · 邮箱：hi@bu31.com',
-  '© 2026 BU31 商城 · 汇聚优质数字资源 · 仅供学习交流',
+  '© 2026 SutaShopX 商城 · 汇聚优质数字资源 · 仅供学习交流',
   '支付成功后卡密将立即显示在页面上，并可在「我的订单」中随时查看。',
   'usd');
 
--- 分类（与 BU31 导航一致）
+-- 分类（与 SutaShopX 导航一致）
 INSERT OR IGNORE INTO categories (id, name, slug, description, sort, status) VALUES
   (1, 'AI前沿',   'ai',        '最新 AI 模型与工具', 1, 1),
   (2, '工具软件', 'tools',     '效率神器 · 系统工具', 2, 1),
@@ -39,7 +39,7 @@ VALUES (2, 2, '夸克网盘批量下载器 激活码', 'quark-downloader-key',
 
 -- 演示商品 3：固定内容发货（站点会员）
 INSERT OR IGNORE INTO products (id, category_id, name, slug, subtitle, description, price, status, delivery_type, fixed_content, stock_mode, stock, min_buy, max_buy, sort, purchase_note, created_at, updated_at)
-VALUES (3, 3, 'BU31 永久至尊会员', 'bu31-vip-lifetime',
+VALUES (3, 3, 'SutaShopX 永久至尊会员', 'sutashopx-vip-lifetime',
   '一次开通 · 终身权益',
   '开通后享受全站资源优先下载、专属客服、新货内测等权益。固定内容自动发货。',
   2990, 1, 'FIXED', '恭喜开通至尊会员！请添加客服微信 shidai616 备注「至尊会员+订单号」领取专属权益。', 'UNLIMITED', 999999, 1, 1, 3, '权益以客服发放为准。', strftime('%s','now'), strftime('%s','now'));
@@ -60,14 +60,14 @@ INSERT OR IGNORE INTO payment_gateways (id, type, display_name, gateway_url, app
 
 -- 演示卡密（商品 1）
 INSERT OR IGNORE INTO cards (product_id, content, status, batch_no, created_at) VALUES
-  (1, 'OPENAI-BU31-A1B2-C3D4-E5F6', 0, 'demo-batch-1', strftime('%s','now')),
-  (1, 'OPENAI-BU31-F7G8-H9I0-J1K2', 0, 'demo-batch-1', strftime('%s','now')),
-  (1, 'OPENAI-BU31-L3M4-N5O6-P7Q8', 0, 'demo-batch-1', strftime('%s','now')),
-  (1, 'OPENAI-BU31-R9S0-T1U2-V3W4', 0, 'demo-batch-1', strftime('%s','now')),
-  (1, 'OPENAI-BU31-X5Y6-Z7A8-B9C0', 0, 'demo-batch-1', strftime('%s','now')),
-  (1, 'OPENAI-BU31-D1E2-F3G4-H5I6', 0, 'demo-batch-1', strftime('%s','now')),
-  (1, 'OPENAI-BU31-J7K8-L9M0-N1O2', 0, 'demo-batch-1', strftime('%s','now')),
-  (1, 'OPENAI-BU31-P3Q4-R5S6-T7U8', 0, 'demo-batch-1', strftime('%s','now'));
+  (1, 'OPENAI-SutaShopX-A1B2-C3D4-E5F6', 0, 'demo-batch-1', strftime('%s','now')),
+  (1, 'OPENAI-SutaShopX-F7G8-H9I0-J1K2', 0, 'demo-batch-1', strftime('%s','now')),
+  (1, 'OPENAI-SutaShopX-L3M4-N5O6-P7Q8', 0, 'demo-batch-1', strftime('%s','now')),
+  (1, 'OPENAI-SutaShopX-R9S0-T1U2-V3W4', 0, 'demo-batch-1', strftime('%s','now')),
+  (1, 'OPENAI-SutaShopX-X5Y6-Z7A8-B9C0', 0, 'demo-batch-1', strftime('%s','now')),
+  (1, 'OPENAI-SutaShopX-D1E2-F3G4-H5I6', 0, 'demo-batch-1', strftime('%s','now')),
+  (1, 'OPENAI-SutaShopX-J7K8-L9M0-N1O2', 0, 'demo-batch-1', strftime('%s','now')),
+  (1, 'OPENAI-SutaShopX-P3Q4-R5S6-T7U8', 0, 'demo-batch-1', strftime('%s','now'));
 
 -- 演示卡密（商品 2）
 INSERT OR IGNORE INTO cards (product_id, content, status, batch_no, created_at) VALUES

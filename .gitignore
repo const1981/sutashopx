@@ -16,8 +16,8 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# 无关的源文件（BU31 导航站原型，非本商城代码）
-bu31.html
+# 无关的源文件（SutaShopX 导航站原型，非本商城代码）
+sutashopx.html
 *.png
 !public/**/*.png
 

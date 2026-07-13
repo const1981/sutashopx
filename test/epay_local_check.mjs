@@ -18,8 +18,8 @@ const PID = '10001';
 
 // 模拟一笔订单（order.amount 单位是分）
 const order = {
-  order_no: 'BU31TEST20260712A1',
-  product_name: 'BU31 测试商品',
+  order_no: 'SutaShopXTEST20260712A1',
+  product_name: 'SutaShopX 测试商品',
   amount: 1000, // 分 = 10.00 元
   query_token: 'tok_abc123',
   __requrl: 'https://u.bu31.com/checkout',

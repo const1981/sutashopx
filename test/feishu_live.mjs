@@ -46,7 +46,7 @@ function buildCard() {
         { is_short: true, text: { tag: 'lark_md', content: '**支付方式**\n测试' } },
         { is_short: true, text: { tag: 'lark_md', content: '**发货**\n这是一条测试消息' } },
       ] },
-      { tag: 'note', elements: [{ tag: 'plain_text', content: 'BU31 商城 · 自测脚本' }] },
+      { tag: 'note', elements: [{ tag: 'plain_text', content: 'SutaShopX 商城 · 自测脚本' }] },
     ],
   };
 }

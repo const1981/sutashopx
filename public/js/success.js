@@ -1,5 +1,5 @@
 // ============================================================
-//  BU31 商城 · 支付成功 / 订单结果页
+//  SutaShopX 商城 · 支付成功 / 订单结果页
 // ============================================================
 function toast(msg) {
   const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');

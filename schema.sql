@@ -1,7 +1,7 @@
 -- ============================================================
---  BU31 极简卡密商城 · D1 (SQLite) 建表脚本
---  用法：wrangler d1 execute bu31-shop-db --remote --file=./schema.sql
---  或本地：wrangler d1 execute bu31-shop-db --local --file=./schema.sql
+--  SutaShopX 极简卡密商城 · D1 (SQLite) 建表脚本
+--  用法：wrangler d1 execute sutashopx-db --remote --file=./schema.sql
+--  或本地：wrangler d1 execute sutashopx-db --local --file=./schema.sql
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS admins (
@@ -142,7 +142,7 @@ CREATE INDEX IF NOT EXISTS idx_banners_status ON banners(status, sort);
 
 CREATE TABLE IF NOT EXISTS site_settings (
   id            INTEGER PRIMARY KEY CHECK (id = 1),
-  site_name     TEXT NOT NULL DEFAULT 'BU31 商城',
+  site_name     TEXT NOT NULL DEFAULT 'SutaShopX 商城',
   subtitle      TEXT,
   notice        TEXT,
   support_contact TEXT,

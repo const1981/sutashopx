@@ -1,5 +1,5 @@
 // ============================================================
-//  BU31 商城 · 前台交互
+//  SutaShopX 商城 · 前台交互
 // ============================================================
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -26,7 +26,7 @@ function money(price) {
   return sym + (price / 100).toFixed(2);
 }
 
-// 占位封面（基于分类色生成 SVG），与 BU31 一致
+// 占位封面（基于分类色生成 SVG），与 SutaShopX 一致
 function makeCover(seed, cat) {
   const [c1, c2] = (TONE[cat] && TONE[cat].grad.match(/#[a-f0-9]+/gi)) || ['#888', '#aaa'];
   let s = seed.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
@@ -36,7 +36,7 @@ function makeCover(seed, cat) {
     const x = Math.floor(rnd() * 400), y = Math.floor(rnd() * 250), r = Math.floor(rnd() * 80) + 30;
     shapes.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" opacity="${(rnd() * 0.4 + 0.1).toFixed(2)}"/>`);
   }
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="400" height="250" fill="url(#g)"/>${shapes.join('')}<text x="20" y="225" font-family="Arial,sans-serif" font-size="22" font-weight="800" fill="#fff" opacity="0.85">BU31</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="400" height="250" fill="url(#g)"/>${shapes.join('')}<text x="20" y="225" font-family="Arial,sans-serif" font-size="22" font-weight="800" fill="#fff" opacity="0.85">SutaShopX</text></svg>`;
   return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
 }
 
@@ -273,11 +273,11 @@ $('#feedSort').onclick = (e) => { const b = e.target.closest('button'); if (!b) 
 
 const themeIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 const moonIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
-function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); try { localStorage.setItem('bu31-theme', t); } catch (e) {} }
+function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); try { localStorage.setItem('sutashopx-theme', t); } catch (e) {} }
 function toggleTheme() { const cur = document.documentElement.getAttribute('data-theme'); applyTheme(cur === 'dark' ? 'light' : 'dark'); }
 $('#themeToggle').onclick = toggleTheme;
 $('#themeToggleMobile').onclick = toggleTheme;
-try { const s = localStorage.getItem('bu31-theme'); if (s) document.documentElement.setAttribute('data-theme', s); } catch (e) {}
+try { const s = localStorage.getItem('sutashopx-theme'); if (s) document.documentElement.setAttribute('data-theme', s); } catch (e) {}
 
 $('#backTop').onclick = (e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 $('#bannerPrev').onclick = () => goBanner(bIdx - 1);

@@ -1,10 +1,10 @@
 // ============================================================
-//  BU31 商城 · 管理后台
+//  SutaShopX 商城 · 管理后台
 // ============================================================
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const API_BASE = '';
-let TOKEN = localStorage.getItem('bu31-admin-token') || '';
+let TOKEN = localStorage.getItem('sutashopx-admin-token') || '';
 let CATS = [];
 
 function toast(msg) {
@@ -62,7 +62,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal
 function showLogin() { $('#loginView').classList.remove('hidden'); $('#adminView').classList.add('hidden'); }
 function showAdmin() { $('#loginView').classList.add('hidden'); $('#adminView').classList.remove('hidden'); }
 async function logout() {
-  TOKEN = ''; localStorage.removeItem('bu31-admin-token');
+  TOKEN = ''; localStorage.removeItem('sutashopx-admin-token');
   try { await api('/api/admin/logout', 'POST'); } catch (e) {}
   showLogin();
 }
@@ -75,7 +75,7 @@ $('#loginBtn').onclick = async () => {
   const r = await api('/api/admin/login', 'POST', { username, password });
   if (r.ok) {
     TOKEN = r.data.token || '';
-    if (TOKEN) localStorage.setItem('bu31-admin-token', TOKEN);
+    if (TOKEN) localStorage.setItem('sutashopx-admin-token', TOKEN);
     $('#adminUser').textContent = '你好，' + (r.data.admin.nickname || r.data.admin.username);
     await afterLogin();
   } else { toast(r.data.error || '登录失败'); }
@@ -785,8 +785,8 @@ async function renderAiApi() {
   if (!r.ok) { $('#panel-aiapi').innerHTML = '<p class="empty">加载失败</p>'; return; }
   const c = r.data;
   const keyLine = c.key_set
-    ? `<span class="badge badge-green">已设置</span> 当前 Key（明文仅在已设置时显示，复制给 AI 用）：<code id="aiapi_key" style="user-select:all;background:var(--color-card-2);padding:3px 8px;border-radius:6px;">${c.key_hint ? '(已设) ' + c.key_hint : '已设置'}</code><br><span style="font-size:12px;color:var(--color-ink-soft);">如需看完整 Key，去 Cloudflare → bu31-shop → Settings → Variables and Secrets 查看/修改。</span>`
-    : `<span class="badge badge-orange">未设置</span> 接口当前处于锁定状态（任何调用都会返回 401）。请去 <b>Cloudflare → bu31-shop → Settings → Variables and Secrets → Add</b>，Type 选 <b>Secret</b>，变量名填 <b>AI_API_KEY</b>，值填一个你自己定的 Key，Deploy 后此页会显示「已设置」。`;
+    ? `<span class="badge badge-green">已设置</span> 当前 Key（明文仅在已设置时显示，复制给 AI 用）：<code id="aiapi_key" style="user-select:all;background:var(--color-card-2);padding:3px 8px;border-radius:6px;">${c.key_hint ? '(已设) ' + c.key_hint : '已设置'}</code><br><span style="font-size:12px;color:var(--color-ink-soft);">如需看完整 Key，去 Cloudflare → sutashopx → Settings → Variables and Secrets 查看/修改。</span>`
+    : `<span class="badge badge-orange">未设置</span> 接口当前处于锁定状态（任何调用都会返回 401）。请去 <b>Cloudflare → sutashopx → Settings → Variables and Secrets → Add</b>，Type 选 <b>Secret</b>，变量名填 <b>AI_API_KEY</b>，值填一个你自己定的 Key，Deploy 后此页会显示「已设置」。`;
   const epRows = c.endpoints.map(e => `<tr><td><span class="badge ${e.method === 'DELETE' ? 'badge-gray' : 'badge-blue'}">${e.method}</span></td><td><code>${e.path}</code></td><td style="color:var(--color-ink-soft);font-size:13px;">${e.desc}</td></tr>`).join('');
   $('#panel-aiapi').innerHTML = `
     <div class="table-card" style="padding:22px;">

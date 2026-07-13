@@ -1,4 +1,4 @@
-# BU31 极简卡密商城
+# SutaShopX 极简卡密商城
 
 一套**全部跑在 Cloudflare 上**、零构建、好改的「卡密商城」系统。功能对照开源项目 [edgeKey](https://github.com/34892002/edgeKey)（商品管理 / 卡密管理 / 订单管理 / 多支付 / 后台），但技术栈大幅简化——**单文件 Worker + D1 + 纯 HTML/JS**，没有 Vike/Prisma/Vue 那一套重构建链，改一行逻辑只动一个文件。
 
@@ -15,12 +15,12 @@
 | 站点设置 | 站点名、副标题、公告、客服、页脚、下单提示、货币 |
 | 后台 | 管理员账号 + 密码哈希 + HMAC 签名令牌登录；首次访问自动建默认账号 |
 
-> 前台视觉直接复用你给的 **BU31 导航站**设计语言（配色、卡片、Banner、明暗主题）。
+> 前台视觉直接复用你给的 **SutaShopX 导航站**设计语言（配色、卡片、Banner、明暗主题）。
 
 ## 目录结构
 
 ```
-bu31-shop/
+sutashopx/
 ├── wrangler.toml        # Cloudflare 配置（Worker + 静态资源 + D1 + 定时任务）
 ├── schema.sql           # D1 建表
 ├── seed.sql             # 初始数据（站点设置 / 4 分类 / 3 演示商品 + 卡密）
@@ -30,7 +30,7 @@ bu31-shop/
 │   ├── index.html       # 商城首页（数据驱动）
 │   ├── admin.html       # 管理后台
 │   ├── success.html     # 支付成功 / 订单结果页
-│   ├── css/style.css    # 共享样式（BU31 设计系统 + 商城/后台样式）
+│   ├── css/style.css    # 共享样式（SutaShopX 设计系统 + 商城/后台样式）
 │   └── js/{store,admin,success}.js
 └── test/                # 自测脚本（Node 直接跑，无需 Cloudflare）
     ├── smoke.mjs        # 纯逻辑：密码哈希 / 令牌 / 订单号 / 卡密选取
@@ -53,16 +53,16 @@ node test/integration.mjs  # 端到端测试（会执行 schema.sql/seed.sql）
 wrangler login
 
 # 2. 创建 D1 数据库，记下返回的 database_id
-wrangler d1 create bu31-shop-db
+wrangler d1 create sutashopx-db
 #   然后把 id 填进 wrangler.toml 的 database_id = "..."
 
 # 3. 建表 + 灌初始数据
-wrangler d1 execute bu31-shop-db --remote --file=./schema.sql
-wrangler d1 execute bu31-shop-db --remote --file=./seed.sql
+wrangler d1 execute sutashopx-db --remote --file=./schema.sql
+wrangler d1 execute sutashopx-db --remote --file=./seed.sql
 
 # 4. 创建 R2 存储桶（用于上传商品图 / 幻灯片图）
-wrangler r2 bucket create bu31-shop-files
-#   wrangler.toml 里已绑定 [[r2_buckets]] binding="R2" bucket_name="bu31-shop-files"
+wrangler r2 bucket create sutashopx-files
+#   wrangler.toml 里已绑定 [[r2_buckets]] binding="R2" bucket_name="sutashopx-files"
 
 # 5. 配置密钥（AUTH_SECRET 必填；Stripe 可选）
 wrangler secret put AUTH_SECRET        # 随便输一段足够随机的字符串
@@ -86,15 +86,15 @@ wrangler deploy
 
 ## 线上状态（已部署并真机测试）
 
-- 商城首页：**https://bu31-shop.constlee.workers.dev**
-- 管理后台：**https://bu31-shop.constlee.workers.dev/admin.html**
+- 商城首页：**https://sutashopx.constlee.workers.dev**
+- 管理后台：**https://sutashopx.constlee.workers.dev/admin.html**
 - **默认管理员：admin / admin123456，首次登录后请立即在「设置」里改密码**
-- 已建资源：D1 `bu31-shop-db`、R2 `bu31-shop-files`，`AUTH_SECRET` 已注入。
+- 已建资源：D1 `sutashopx-db`、R2 `sutashopx-files`，`AUTH_SECRET` 已注入。
 - **BEpusdt 已真实对接**：后台已配置 AWS API Gateway 网关地址和 App Secret；真机下单成功返回 BEpusdt 收银台链接；构造回调验签通过并自动发货（订单状态 `DELIVERED`、卡密已发出）。
 
 部署完成后（首次本地部署）：
-- 商城首页：`https://bu31-shop.<你的子域>.workers.dev`
-- 管理后台：`https://bu31-shop.<你的子域>.workers.dev/admin.html`
+- 商城首页：`https://sutashopx.<你的子域>.workers.dev`
+- 管理后台：`https://sutashopx.<你的子域>.workers.dev/admin.html`
 - **默认管理员：admin / admin123456，首次登录后请立即在「设置」里改密码**
 
 > ⚠️ 上线必做三件事：

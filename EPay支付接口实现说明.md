@@ -1,7 +1,7 @@
-# EPay / VPAY 支付接口实现说明（u.bu31.com 商城）
+# EPay / VPAY 支付接口实现说明（SutaShopX）
 
 > 状态：**已落地实施**（代码已改 `src/worker.js` 三处 + 部署自测）。
-> 改动范围：仅 `bu31/src/worker.js` 一个文件。前端 `store.js` 不用改。
+> 改动范围：仅 `sutashopx/src/worker.js` 一个文件。前端 `store.js` 不用改。
 > 支付模型（臣哥确认）：**聚合码 + APP 推送确认** —— 下单后 VPAY 返回一个支付宝/微信都能扫的统一收款码；用户付款后，收款手机 APP 监听到账 → VPAY 匹配订单 → 异步回调我们 `/api/payments/epay/notify` → 我们验签 → 发货。判定支付成功的唯一可靠依据是**异步回调**，不是前端跳转。
 
 ---
@@ -92,7 +92,7 @@
         pid: g.app_id,
         type: channel,
         out_trade_no: order.order_no,
-        name: order.product_name || 'BU31 商品',
+        name: order.product_name || 'SutaShopX 商品',
         money: (Number(order.amount) / 100).toFixed(2), // 分 → 元，两位小数
         notify_url: notifyUrl,
         return_url: `${origin}/order/${order.order_no}?token=${order.query_token}`,
@@ -185,7 +185,7 @@ async function handleEpayNotify(env, request) {
 - [x] 写方案文档（本案）
 - [x] 改 `worker.js`：epay 下单 + `/api/payments/epay/notify` 路由 + `handleEpayNotify`
 - [x] 本地逻辑自测（`test/epay_local_check.mjs`，node 跑通）：① 下单生成 payUrl 格式正确、sign=32位hex ✅ ② VPAY 正确签名回调验签 PASS ✅ ③ 篡改金额回调被拒 ✅
-- [x] `wrangler deploy`：2026-07-12 部署成功（worker `bu31-shop`，版本 95fca171，modified_on 14:47Z）。u.bu31.com 自定义域→bu31-shop，刚部署时自定义域切版本有 ~分钟级延迟，重测即生效。
+- [x] `wrangler deploy`：2026-07-12 部署成功（worker `sutashopx`，版本 95fca171，modified_on 14:47Z）。u.bu31.com 自定义域→sutashopx，刚部署时自定义域切版本有 ~分钟级延迟，重测即生效。
 - [x] **线上 E2E 自测全通过**（2026-07-12）：
   - 建单（gateway=3 / type=epay）→ 返回 `mode:"epay"` + `payUrl=https://vpay.yaode.eu.org/submit.php?pid=10001&type=alipay&out_trade_no=...&money=0.20&notify_url=https://u.bu31.com/api/payments/epay/notify&sign=...` ✅
   - 用臣哥确认的真实 KEY 复算 sign，与线上生成 sign **完全一致**（MATCH=true）✅
@@ -195,7 +195,7 @@ async function handleEpayNotify(env, request) {
 - [ ] 真实扫码支付：需臣哥用手机扫 VPAY 支付页里的聚合码完成真实付款，观察 VPAY APP 监听→回调→发货全链路（代码已验证，真实环境仅差这一步人工确认）。
 
 ## 6.1 排错要点（本次踩的坑，后续部署牢记）
-- **自定义域（Custom Domain）绑定的 worker 刚部署后，版本切换有延迟**：不是代码没部署，而是 u.bu31.com 这个自定义域还指着旧版本，等 1-2 分钟重测即生效。判断部署是否真生效：先测 USDT 网关（id=1，旧代码也有）能返回真实 payUrl，再确认 epay 分支；或直接查 `workers/scripts/bu31-shop` 的 `modified_on` 是否刚更新。
+- **自定义域（Custom Domain）绑定的 worker 刚部署后，版本切换有延迟**：不是代码没部署，而是 u.bu31.com 这个自定义域还指着旧版本，等 1-2 分钟重测即生效。判断部署是否真生效：先测 USDT 网关（id=1，旧代码也有）能返回真实 payUrl，再确认 epay 分支；或直接查 `workers/scripts/sutashopx` 的 `modified_on` 是否刚更新。
 - **金额单位是「分」**：全站（前端 `money()`、USDT `createUsdtPayment`）都 `amount/100` 转元，epay 同样 `(order.amount/100).toFixed(2)`，与既有逻辑一致，勿改。
 - **wrangler 新版已移除 `--yes` 参数**：直接 `wrangler deploy` 即可（带 `CF_API_TOKEN` 环境变量 + 本机 10808 代理）。
 

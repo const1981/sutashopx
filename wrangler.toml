@@ -1,4 +1,4 @@
-name = "bu31-shop"
+name = "sutashopx"
 main = "src/worker.js"
 compatibility_date = "2024-09-23"
 account_id = "bc9124edf58983170fd5122a86fa39e8"
@@ -9,8 +9,8 @@ assets = { directory = "./public", binding = "ASSETS" }
 # Cloudflare D1 数据库（商品 / 卡密 / 订单）
 [[d1_databases]]
 binding = "DB"
-database_name = "bu31-shop-db"
-# 部署前执行 `wrangler d1 create bu31-shop-db`，把返回的 database_id 填到下面这行：
+database_name = "sutashopx-db"
+# 部署前执行 `wrangler d1 create sutashopx-db`，把返回的 database_id 填到下面这行：
 database_id = "d5984cd4-51e3-478d-a608-292176194218"
 
 # 每 5 分钟清理一次超时未支付订单
@@ -20,13 +20,13 @@ crons = ["*/5 * * * *"]
 # 文件存储（商品封面 / 幻灯片图片等），通过 Worker 路由 /file/<key> 读取
 [[r2_buckets]]
 binding = "R2"
-bucket_name = "bu31-shop-files"
+bucket_name = "sutashopx-files"
 
 # ===== 普通变量（非机密，可写在这里）=====
 [vars]
 PAYMENT_MODE = "auto"        # auto = 检测到 Stripe 密钥就用 Stripe，否则走演示模式
 STRIPE_CURRENCY = "usd"      # Stripe 结算币种
-SITE_NAME = "BU31 商城"
+SITE_NAME = "SutaShopX 商城"
 
 # ===== 机密变量（务必用 `wrangler secret put` 设置，不要写在这里）=====
 # AUTH_SECRET         -> 管理员会话签名密钥（必须设置，否则后台无法登录）

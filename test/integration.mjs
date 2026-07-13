@@ -100,7 +100,7 @@ const ctx = {};
 let r = await worker.fetch(req('GET', '/api/config'), env, ctx);
 let d = await jr(r);
 ok('GET /api/config 200', r.status === 200);
-ok('配置含站点名', d.data.site && d.data.site.site_name === 'BU31 商城');
+ok('配置含站点名', d.data.site && d.data.site.site_name === 'SutaShopX 商城');
 ok('配置含 4 个分类', d.data.categories.length === 4);
 ok('配置含 3 个种子幻灯片', Array.isArray(d.data.banners) && d.data.banners.length === 3, d.data.banners && d.data.banners.length);
 ok('幻灯片含标题字段', d.data.banners[0] && d.data.banners[0].title === '数字好物 支付即发', d.data.banners[0]);
@@ -267,7 +267,7 @@ d = await jr(r);
 ok('手动确认后订单已发货', d.data.status === 'DELIVERED', d.data);
 
 // 16. R2 文件上传 + 代理读取
-const upBuf = Buffer.from('hello bu31 local r2 test');
+const upBuf = Buffer.from('hello sutashopx local r2 test');
 const upB64 = upBuf.toString('base64');
 const upReq = new Request('https://shop.test/api/admin/upload', {
   method: 'POST',

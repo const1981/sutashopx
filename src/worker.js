@@ -1,5 +1,5 @@
 // ============================================================
-//  BU31 极简卡密商城 · 后端（Cloudflare Worker，原生 JS，零依赖）
+//  SutaShopX 极简卡密商城 · 后端（Cloudflare Worker，原生 JS，零依赖）
 //  - 前台静态资源由 env.ASSETS 提供
 //  - /api/* 走这里
 //  改逻辑只需要动这一个文件。
@@ -727,7 +727,7 @@ async function sendFeishu(env, order, provider, res) {
           { is_short: true, text: { tag: 'lark_md', content: `**支付方式**\n${providerTxt}` } },
           { is_short: true, text: { tag: 'lark_md', content: `**发货**\n${deliverTxt}` } },
         ] },
-        { tag: 'note', elements: [{ tag: 'plain_text', content: `BU31 商城 · ${new Date().toLocaleString('zh-CN')}` }] }
+        { tag: 'note', elements: [{ tag: 'plain_text', content: `SutaShopX 商城 · ${new Date().toLocaleString('zh-CN')}` }] }
       ]
     };
     const body = { msg_type: 'interactive', card };
@@ -887,7 +887,7 @@ async function createPayment(env, order, product, gatewayId) {
         pid: g.app_id,
         type: channel,
         out_trade_no: order.order_no,
-        name: order.product_name || 'BU31 商品',
+        name: order.product_name || 'SutaShopX 商品',
         money: (Number(order.amount) / 100).toFixed(2), // 分 → 元，两位小数
         notify_url: notifyUrl,
         return_url: `${origin}/order/${order.order_no}?token=${order.query_token}`,
@@ -1339,7 +1339,7 @@ async function handleApi(request, env, ctx) {
 
   // AI 运营接口配置（后台「AI 接口」页用）——只返回是否设置 + base URL，不泄露明文 key
   if (path === '/api/admin/machine-config' && method === 'GET') {
-    const origin = (url.origin && url.origin.startsWith('http')) ? url.origin : (env.BASE_URL || 'https://bu31-shop.constlee.workers.dev');
+    const origin = (url.origin && url.origin.startsWith('http')) ? url.origin : (env.BASE_URL || 'https://sutashopx.constlee.workers.dev');
     return json({
       base_url: origin,
       key_set: !!env.AI_API_KEY,
@@ -1566,7 +1566,7 @@ async function handleApi(request, env, ctx) {
     await run(
       env,
       `UPDATE site_settings SET site_name=?,subtitle=?,notice=?,support_contact=?,footer_text=?,order_notice=?,currency=?,feishu_webhook=?,feishu_secret=? WHERE id=1`,
-      b.site_name || 'BU31 商城', b.subtitle || '', b.notice || '', b.support_contact || '',
+      b.site_name || 'SutaShopX 商城', b.subtitle || '', b.notice || '', b.support_contact || '',
       b.footer_text || '', b.order_notice || '', b.currency || 'usd',
       b.feishu_webhook || '', b.feishu_secret || ''
     );
