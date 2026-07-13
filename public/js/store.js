@@ -156,8 +156,7 @@ async function loadProducts() {
           : (p.availableStock <= 5 ? `<span class="stock-hint stock-low">仅剩 ${p.availableStock} 件</span>` : `<span class="stock-hint">库存 ${p.availableStock}</span>`));
       const soldOut = p.stock_mode !== 'UNLIMITED' && p.availableStock <= 0;
       return `<article class="feed-card ${tone}" data-id="${p.id}" style="animation-delay:${i * 50}ms">
-        <div class="card-thumb"><div class="card-thumb-tone"></div>
-          <img loading="lazy" decoding="async" src="${p.cover_image || makeCover('p' + p.id, p.category_slug)}" alt="${p.name}">
+        <div class="card-thumb" style="background-image:url('${(p.cover_image || makeCover('p' + p.id, p.category_slug)).replace(/'/g, '')}')"><div class="card-thumb-tone"></div>
           <span class="card-type-badge">${p.category_name || '商品'}</span>
         </div>
         <div class="card-body">
@@ -199,7 +198,7 @@ async function openDetail(id) {
   $('#modalTitle').textContent = product.name;
   const stockTxt = product.stock_mode === 'UNLIMITED' ? '库存充足' : `库存 ${product.availableStock ?? product.stock}`;
   $('#modalBody').innerHTML = `
-    <img class="detail-cover" src="${product.cover_image || makeCover('p' + product.id, product.category_slug)}" alt="${product.name}">
+    <div class="detail-cover" style="background-image:url('${(product.cover_image || makeCover('p' + product.id, p.category_slug)).replace(/\'/g, '')}')"></div>
     <div class="detail-meta">
       <span class="tag-chip tag-chip--blue">${product.category_name || '商品'}</span>
       <span class="tag-chip tag-chip--mint">${product.delivery_type === 'CARD_AUTO' ? '自动发卡' : product.delivery_type === 'FIXED' ? '固定内容' : '人工发货'}</span>

@@ -33,3 +33,6 @@ wrangler.toml.local
 
 # 记忆与工具目录
 .workbuddy/
+
+# wrangler --outdir 临时构建产物
+dist_build/
