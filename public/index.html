@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="/logo.png">
 <title>SutaShopX 商城 · 精选数字好物</title>
 <meta name="description" content="SutaShopX 商城 - AI 前沿、工具软件、创业项目、素材资源的精选数字商品，支付后自动发货卡密秒到">
-<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/style.css?v=2">
 </head>
 <body>
 
@@ -37,14 +37,22 @@
   <div class="shell mobile-shell">
     <button class="hamburger" id="hamburger" aria-label="菜单"><span></span><span></span><span></span></button>
     <a class="brand" href="/"><div class="brand-logo"><img src="/logo.png" alt="SutaShopX"></div><div class="brand-name"><b>SutaShopX 商城</b></div></a>
-      <div class="hsearch mobile">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <input id="mobileSearch" type="text" placeholder="搜索商品…">
-        <button class="search-clear" id="mobileClear" aria-label="清除搜索" title="清除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
-      </div>
     <button class="icon-btn" id="themeToggleMobile" aria-label="切换主题"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
   </div>
 </header>
+
+<!-- ============== 移动版 Hero（搜索入口） ============== -->
+<section class="mobile-hero">
+  <div class="shell">
+    <h1 class="hero-title">发现精选数字好物</h1>
+    <p class="hero-subtitle">AI · 工具 · 项目 · 素材</p>
+    <div class="hero-search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="mobileSearch" type="text" placeholder="搜索商品…" autocomplete="off">
+      <button class="search-clear" id="mobileClear" aria-label="清除搜索" title="清除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+  </div>
+</section>
 
 <!-- ============== 抽屉 ============== -->
 <div class="drawer-mask" id="drawerMask"></div>
