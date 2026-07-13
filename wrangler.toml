@@ -1,7 +1,7 @@
 name = "sutashopx"
 main = "src/worker.js"
 compatibility_date = "2024-09-23"
-account_id = "bc9124edf58983170fd5122a86fa39e8"
+account_id = "bb7f172e91305adfcbca8a0f0105ff35"
 
 # 前台静态页面目录（index.html / admin.html / success.html / css / js）
 assets = { directory = "./public", binding = "ASSETS" }
@@ -11,16 +11,18 @@ assets = { directory = "./public", binding = "ASSETS" }
 binding = "DB"
 database_name = "sutashopx-db"
 # 部署前执行 `wrangler d1 create sutashopx-db`，把返回的 database_id 填到下面这行：
-database_id = "d5984cd4-51e3-478d-a608-292176194218"
+database_id = "6d84c357-c3c9-46f9-8dbc-f758a8fc2bf6"
 
 # 每 5 分钟清理一次超时未支付订单
 [triggers]
 crons = ["*/5 * * * *"]
 
 # 文件存储（商品封面 / 幻灯片图片等），通过 Worker 路由 /file/<key> 读取
-[[r2_buckets]]
-binding = "R2"
-bucket_name = "sutashopx-files"
+# 注意：当前 Cloudflare 账号尚未启用 R2（code:10042），桶暂未创建。
+# 待账号开通 R2 后执行 `wrangler r2 bucket create sutashopx-files` 并取消下方注释即可。
+# [[r2_buckets]]
+# binding = "R2"
+# bucket_name = "sutashopx-files"
 
 # ===== 普通变量（非机密，可写在这里）=====
 [vars]
