@@ -5,6 +5,7 @@ function toast(msg) {
   const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(t._timer); t._timer = setTimeout(() => t.classList.remove('show'), 2200);
 }
+function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 const params = new URLSearchParams(location.search);
 const orderNo = params.get('order');
 const token = params.get('token') || '';
@@ -47,6 +48,15 @@ function renderResult(data) {
   }
   const note = document.getElementById('noteArea');
   note.textContent = o.delivery_note || '';
+  const dl = document.getElementById('dlArea');
+  if (dl) {
+    if (o.file_key && (o.status === 'DELIVERED' || o.status === 'PAID')) {
+      dl.classList.remove('hidden');
+      dl.innerHTML = `<a class="btn btn-primary" href="/api/files/${encodeURIComponent(token)}" style="width:100%;justify-content:center;padding:11px;box-sizing:border-box;">⬇️ 下载文件：${esc(o.file_name || '商品文件')}</a>`;
+    } else {
+      dl.classList.add('hidden'); dl.innerHTML = '';
+    }
+  }
 }
 
 if (!orderNo) {

@@ -40,6 +40,10 @@ CREATE TABLE IF NOT EXISTS products (
   max_buy       INTEGER NOT NULL DEFAULT 1,
   sort          INTEGER NOT NULL DEFAULT 0,
   purchase_note TEXT,
+  file_key      TEXT,
+  file_name     TEXT,
+  file_size     INTEGER NOT NULL DEFAULT 0,
+  file_uploaded_at INTEGER,
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL
 );

@@ -21,6 +21,7 @@ async function api(path, method = 'GET', body) {
   return { ok: r.ok, status: r.status, data };
 }
 function money(p) { return (p / 100).toFixed(2); }
+function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
 // 用 base64 JSON 上传文件到 R2（绕开 Cloudflare 对 multipart formData 的解析崩溃）
 async function uploadToR2(file, inputEl) {
@@ -40,7 +41,7 @@ async function uploadToR2(file, inputEl) {
     body: JSON.stringify({ filename: file.name, contentType: file.type || 'application/octet-stream', data: b64 })
   });
   const d = await r.json().catch(() => ({}));
-  if (r.ok && d.url) { if (inputEl) inputEl.value = d.url; return d.url; }
+  if (r.ok && d.ok) { if (inputEl) inputEl.value = d.url; return d; }
   toast(d.error || '上传失败');
   return null;
 }
@@ -202,6 +203,10 @@ async function openProductForm(id) {
       </div>
       <input type="file" id="f_file" accept="image/*" style="display:none;">
     </div>
+    <div class="field"><label>商品下载文件（客户购买后可在成功页下载，如安装包 / 资料，单文件）</label>
+      <div id="fileBox"></div>
+      <input type="file" id="f_pfile" style="display:none;">
+    </div>
     <div class="field"><label>购买须知</label><textarea id="f_note">${p ? (p.purchase_note || '') : ''}</textarea></div>
     <div class="field"><label>详情描述</label><textarea id="f_desc">${p ? (p.description || '') : ''}</textarea></div>
     <div style="display:flex;gap:10px;margin-top:10px;">
@@ -213,9 +218,34 @@ async function openProductForm(id) {
   $('#f_file').onchange = async () => {
     const f = $('#f_file').files[0]; if (!f) return;
     $('#f_upload').textContent = '上传中…';
-    const url = await uploadToR2(f, $('#f_cover'));
+    const up = await uploadToR2(f, $('#f_cover'));
     $('#f_upload').textContent = '上传';
-    if (url) toast('上传成功');
+    if (up) toast('上传成功');
+  };
+  // 商品下载文件：选择文件 → 上传 R2 → 暂存 key，保存时写入商品
+  let pendingFileKey = p ? (p.file_key || '') : '';
+  let pendingFileName = p ? (p.file_name || '') : '';
+  let pendingFileSize = p ? (p.file_size || 0) : 0;
+  const renderFileBox = () => {
+    const box = $('#fileBox'); if (!box) return;
+    box.innerHTML = pendingFileKey
+      ? `<div style="display:flex;gap:8px;align-items:center;"><span style="font-weight:600;">${esc(pendingFileName || '文件')}</span> <button class="mini-btn" id="copyFileLink" type="button">复制链接</button> <button class="mini-btn danger" id="delFile" type="button">移除</button></div>`
+      : `<button class="mini-btn" id="pickFile" type="button">选择文件上传</button>`;
+    const pf = $('#pickFile'); if (pf) pf.onclick = () => $('#f_pfile').click();
+    const cf = $('#copyFileLink'); if (cf) cf.onclick = () => { if (pendingFileKey) { navigator.clipboard.writeText(`${location.origin}/file/${pendingFileKey}`); toast('已复制文件链接'); } };
+    const df = $('#delFile'); if (df) df.onclick = async () => {
+      if (p && p.file_key) { const rr = await api('/api/admin/products/' + id + '/file', 'DELETE'); if (!rr.ok) toast(rr.data.error || '移除失败'); }
+      pendingFileKey = ''; pendingFileName = ''; pendingFileSize = 0; renderFileBox(); toast('已移除文件');
+    };
+  };
+  renderFileBox();
+  $('#f_pfile').onchange = async () => {
+    const f = $('#f_pfile').files[0]; if (!f) return;
+    if (f.size > 30 * 1024 * 1024) { toast('文件过大，建议小于 30MB'); $('#f_pfile').value = ''; return; }
+    toast('文件上传中…');
+    const up = await uploadToR2(f, null);
+    if (up && up.key) { pendingFileKey = up.key; pendingFileName = f.name; pendingFileSize = f.size; renderFileBox(); toast('文件已就绪，保存后生效'); }
+    $('#f_pfile').value = '';
   };
   $('#f_cancel').onclick = closeModal;
   $('#f_save').onclick = async () => {
@@ -235,6 +265,10 @@ async function openProductForm(id) {
       cover_image: $('#f_cover').value.trim(),
       purchase_note: $('#f_note').value,
       description: $('#f_desc').value,
+      file_key: pendingFileKey || null,
+      file_name: pendingFileName || null,
+      file_size: parseInt(pendingFileSize || 0, 10),
+      file_uploaded_at: pendingFileKey ? Math.floor(Date.now() / 1000) : null,
     };
     if (!payload.name) { toast('请填写商品名称'); return; }
     const r = id ? await api('/api/admin/products/' + id, 'PUT', payload) : await api('/api/admin/products', 'POST', payload);
@@ -319,7 +353,7 @@ async function renderOrders() {
       <td>×${o.quantity}</td>
       <td><span class="badge ${badge}">${o.status}</span></td>
       <td>${dt}</td>
-      <td>${o.contact_value || '-'}</td>
+      <td class="contact-cell">${o.contact_value ? `<span class="cv">${esc(o.contact_value)}</span> <button class="mini-btn" data-c="${esc(o.contact_value)}" type="button" title="复制联系方式">复制</button>` : '-'}</td>
       <td>${new Date(o.created_at * 1000).toLocaleString()}</td>
       <td><button class="mini-btn" data-oid="${o.id}">详情</button></td></tr>`;
   }).join('') : '<tr><td colspan="10" class="empty">暂无订单</td></tr>';
@@ -340,6 +374,13 @@ async function renderOrders() {
   $('#orderFilter').value = status;
   $('#orderFilter').onchange = renderOrders;
   $$('#panel-orders [data-oid]').forEach(b => b.onclick = () => openOrder(+b.dataset.oid));
+  // 联系方式一键复制
+  $$('#panel-orders [data-c]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    const v = b.getAttribute('data-c');
+    if (navigator.clipboard) navigator.clipboard.writeText(v).then(() => toast('已复制联系方式')).catch(() => toast('复制失败'));
+    else toast('当前环境不支持复制');
+  });
 
   // 选择 / 批量删除逻辑
   const checks = $$('#panel-orders .ord-chk');

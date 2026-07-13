@@ -873,8 +873,31 @@ async function createPayment(env, order, product, gatewayId) {
         return { ok: true, provider: 'stripe', payUrl: data.url };
       } catch (e) { return { ok: false, provider: 'stripe', error: e.message }; }
     }
-    if (g.type === 'alipay' || g.type === 'epay' || g.type === 'wechat') {
-      // 这些网关暂未接真实下单，提示用演示/USDT；这里回退到演示以便测试
+    if (g.type === 'epay') {
+      // 易支付（VPAY 免签）：下单后返回一个内含统一收款二维码的支付页，
+      // 用户用 支付宝/微信 扫码即可；支付成功由 VPAY 异步回调 /api/payments/epay/notify 确认。
+      const base = (g.gateway_url || '').replace(/\/+$/, '');
+      const key = g.app_secret || '';
+      const channel = safeJson(g.extra, {}).channel || 'alipay'; // 默认支付宝通道（VPAY 返回聚合码，两者都能扫）
+      const origin = new URL(order.__requrl).origin;
+      const notifyUrl = (g.notify_url && /^https?:\/\//i.test(g.notify_url))
+        ? g.notify_url
+        : `${origin}/api/payments/epay/notify`;
+      const params = {
+        pid: g.app_id,
+        type: channel,
+        out_trade_no: order.order_no,
+        name: order.product_name || 'BU31 商品',
+        money: (Number(order.amount) / 100).toFixed(2), // 分 → 元，两位小数
+        notify_url: notifyUrl,
+        return_url: `${origin}/order/${order.order_no}?token=${order.query_token}`,
+      };
+      params.sign = signBepusdt(params, key); // 复用现有签名函数（与 VPAY 的 signEpay 算法一致）
+      const payUrl = `${base}/submit.php?` + new URLSearchParams(params).toString();
+      return { ok: true, provider: 'epay', payUrl };
+    }
+    if (g.type === 'alipay' || g.type === 'wechat') {
+      // 暂未接官方通道，回退演示（保留原行为）
       return { ok: true, provider: 'demo', payUrl: `/success.html?order=${order.order_no}&demo=1&token=${order.query_token}` };
     }
   }
@@ -955,6 +978,54 @@ async function handleUsdtNotify(env, request) {
   await run(env, 'INSERT INTO payment_logs (order_id,provider,order_no,event_type,raw,verify_status,created_at) VALUES (?,?,?,?,?,?,?)',
     order.id, 'usdt', orderNo, 'notify', JSON.stringify(body), 'VERIFIED', nowSec());
   return new Response('ok', { status: 200 });
+}
+
+// 易支付（VPAY 免签）异步回调：验签 + 发货
+// VPAY 以 form 表单 POST 异步通知；响应体含 success 即通知成功
+async function handleEpayNotify(env, request) {
+  let data = {};
+  try {
+    const ct = request.headers.get('content-type') || '';
+    if (ct.includes('application/json')) data = await request.json();
+    else {
+      const fd = await request.formData();
+      for (const [k, v] of fd.entries()) data[k] = v;
+    }
+  } catch {
+    return new Response('success'); // 解析失败也回 success，避免无意义重试
+  }
+
+  const outTradeNo = data.out_trade_no || '';
+  const order = await first(env, 'SELECT * FROM orders WHERE order_no=?', outTradeNo);
+  if (!order) return new Response('success');
+
+  // 验签：排除 sign / sign_type，复用 signBepusdt（与 VPAY 的 signEpay 算法一致）
+  const gw = await first(env, "SELECT * FROM payment_gateways WHERE type='epay' AND enabled=1 LIMIT 1");
+  const key = gw ? (gw.app_secret || '') : '';
+  const signed = { ...data };
+  delete signed.sign;
+  delete signed.sign_type;
+  const expected = signBepusdt(signed, key);
+  if (expected !== (data.sign || '')) {
+    await run(env, 'INSERT INTO payment_logs (order_id,provider,order_no,event_type,raw,verify_status,message,created_at) VALUES (?,?,?,?,?,?,?,?)',
+      order.id, 'epay', outTradeNo, 'notify', JSON.stringify(data), 'INVALID_SIGN', '签名校验失败', nowSec());
+    return new Response('sign error', { status: 400 }); // 验签失败：拒绝，让网关告警/重试以暴露配置问题
+  }
+
+  await run(env, 'INSERT INTO payment_logs (order_id,provider,order_no,event_type,raw,verify_status,created_at) VALUES (?,?,?,?,?,?,?)',
+    order.id, 'epay', outTradeNo, 'notify', JSON.stringify(data), 'RECEIVED', nowSec());
+
+  // 非成功状态：仅记录，不发货
+  if (String(data.trade_status || '') !== 'TRADE_SUCCESS') return new Response('success');
+
+  // 幂等：已支付直接回 success，绝不重复发货
+  if (order.status !== 'PENDING') return new Response('success');
+
+  const tradeNo = data.trade_no || ('epay-' + outTradeNo);
+  await markPaid(env, order, 'epay', tradeNo); // 内部自动 deliverOrder 发货 + sendFeishu 飞书
+  await run(env, 'INSERT INTO payment_logs (order_id,provider,order_no,event_type,raw,verify_status,created_at) VALUES (?,?,?,?,?,?,?)',
+    order.id, 'epay', outTradeNo, 'notify', JSON.stringify(data), 'VERIFIED', nowSec());
+  return new Response('success');
 }
 
 // ---------- 超时订单清理（定时任务）----------
@@ -1106,6 +1177,10 @@ async function handleApi(request, env, ctx) {
   if (path === '/api/payments/bepusdt/notify' && method === 'POST') {
     return await handleUsdtNotify(env, request);
   }
+  // ---- 公开：易支付（VPAY）回调 ----
+  if (path === '/api/payments/epay/notify' && method === 'POST') {
+    return await handleEpayNotify(env, request);
+  }
 
   // ---- 机器批量接口（AI 运营入口，x-api-key 鉴权）----
   if (path.startsWith('/api/machine/')) {
@@ -1144,7 +1219,7 @@ async function handleApi(request, env, ctx) {
     if (!order) return jsonErr('订单不存在', 404);
     if (token !== order.query_token) return jsonErr('无权限查看', 403);
     const keys = order.delivered_keys ? JSON.parse(order.delivered_keys) : [];
-    const prod = await first(env, 'SELECT delivery_type FROM products WHERE id=?', order.product_id);
+    const prod = await first(env, 'SELECT delivery_type, file_key, file_name FROM products WHERE id=?', order.product_id);
     return json({
       order: {
         order_no: order.order_no, status: order.status, amount: order.amount,
@@ -1152,9 +1227,34 @@ async function handleApi(request, env, ctx) {
         payment_provider: order.payment_provider, created_at: order.created_at,
         delivery_note: order.delivery_note,
         delivery_type: prod ? prod.delivery_type : '',
+        file_key: prod ? (prod.file_key || '') : '',
+        file_name: prod ? (prod.file_name || '') : '',
       },
       keys,
     });
+  }
+
+  // ---- 公开：已购客户下载商品文件（用订单 query_token 鉴权，仅 PAID/DELIVERED 可下）----
+  {
+    const dm = path.match(/^\/api\/files\/([A-Za-z0-9]+)$/);
+    if (dm && method === 'GET') {
+      if (!env.R2) return jsonErr('未配置文件存储', 500);
+      const order = await first(env, 'SELECT * FROM orders WHERE query_token=?', dm[1]);
+      if (!order) return jsonErr('无效下载链接', 404);
+      if (order.status !== 'PAID' && order.status !== 'DELIVERED') return jsonErr('订单尚未支付，无法下载', 403);
+      const product = await first(env, 'SELECT file_key, file_name FROM products WHERE id=?', order.product_id);
+      if (!product || !product.file_key) return jsonErr('该商品暂无下载文件', 404);
+      const obj = await env.R2.get(product.file_key);
+      if (!obj) return jsonErr('文件不存在', 404);
+      const fname = encodeURIComponent(product.file_name || 'file');
+      return new Response(obj.body, {
+        headers: {
+          'Content-Type': (obj.httpMetadata && obj.httpMetadata.contentType) ? obj.httpMetadata.contentType : 'application/octet-stream',
+          'Content-Disposition': `attachment; filename="${fname}"; filename*=UTF-8''${fname}`,
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
   }
 
   // ---- Stripe Webhook ----
@@ -1287,13 +1387,15 @@ async function handleApi(request, env, ctx) {
     const slug = b.slug || ('p' + Date.now());
     const id = await insertId(
       env,
-      `INSERT INTO products (category_id,name,slug,subtitle,description,cover_image,price,status,delivery_type,fixed_content,stock_mode,stock,min_buy,max_buy,sort,purchase_note,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO products (category_id,name,slug,subtitle,description,cover_image,price,status,delivery_type,fixed_content,stock_mode,stock,min_buy,max_buy,sort,purchase_note,file_key,file_name,file_size,file_uploaded_at,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       b.category_id || null, b.name, slug, b.subtitle || '', b.description || '',
       b.cover_image || '', parseInt(b.price || 0, 10), b.status === 0 ? 0 : 1,
       b.delivery_type || 'CARD_AUTO', b.fixed_content || '', b.stock_mode || 'FINITE',
       parseInt(b.stock || 0, 10), parseInt(b.min_buy || 1, 10), parseInt(b.max_buy || 1, 10),
-      parseInt(b.sort || 0, 10), b.purchase_note || '', nowSec(), nowSec()
+      parseInt(b.sort || 0, 10), b.purchase_note || '',
+      b.file_key || null, b.file_name || null, parseInt(b.file_size || 0, 10), b.file_uploaded_at || null,
+      nowSec(), nowSec()
     );
     return json({ ok: true, id });
   }
@@ -1305,12 +1407,14 @@ async function handleApi(request, env, ctx) {
     try { b = await request.json(); } catch { return jsonErr('请求体格式错误'); }
     await run(
       env,
-      `UPDATE products SET category_id=?,name=?,slug=?,subtitle=?,description=?,cover_image=?,price=?,status=?,delivery_type=?,fixed_content=?,stock_mode=?,stock=?,min_buy=?,max_buy=?,sort=?,purchase_note=?,updated_at=? WHERE id=?`,
+      `UPDATE products SET category_id=?,name=?,slug=?,subtitle=?,description=?,cover_image=?,price=?,status=?,delivery_type=?,fixed_content=?,stock_mode=?,stock=?,min_buy=?,max_buy=?,sort=?,purchase_note=?,file_key=?,file_name=?,file_size=?,file_uploaded_at=?,updated_at=? WHERE id=?`,
       b.category_id || null, b.name, b.slug || ('p' + m[1]), b.subtitle || '', b.description || '',
       b.cover_image || '', parseInt(b.price || 0, 10), b.status === 0 ? 0 : 1,
       b.delivery_type || 'CARD_AUTO', b.fixed_content || '', b.stock_mode || 'FINITE',
       parseInt(b.stock || 0, 10), parseInt(b.min_buy || 1, 10), parseInt(b.max_buy || 1, 10),
-      parseInt(b.sort || 0, 10), b.purchase_note || '', nowSec(), m[1]
+      parseInt(b.sort || 0, 10), b.purchase_note || '',
+      b.file_key || null, b.file_name || null, parseInt(b.file_size || 0, 10), b.file_uploaded_at || null,
+      nowSec(), m[1]
     );
     return json({ ok: true });
   }
@@ -1318,6 +1422,16 @@ async function handleApi(request, env, ctx) {
     await run(env, 'DELETE FROM cards WHERE product_id=?', m[1]);
     await run(env, 'DELETE FROM products WHERE id=?', m[1]);
     return json({ ok: true });
+  }
+  // 删除商品已上传文件（清字段 + 删 R2 对象），仅后台可调用（上方已统一鉴权）
+  {
+    const fm = path.match(/^\/api\/admin\/products\/(\d+)\/file$/);
+    if (fm && method === 'DELETE') {
+      const product = await first(env, 'SELECT file_key FROM products WHERE id=?', fm[1]);
+      if (product && product.file_key && env.R2) { try { await env.R2.delete(product.file_key); } catch (e) {} }
+      await run(env, 'UPDATE products SET file_key=NULL, file_name=NULL, file_size=0, file_uploaded_at=NULL WHERE id=?', fm[1]);
+      return json({ ok: true });
+    }
   }
   // 按 ID 取商品详情（后台编辑表单用；注意此 m 在下方会被 keys 正则覆盖，必须放前面）
   if (m && method === 'GET') {

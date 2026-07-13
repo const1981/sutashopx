@@ -1,0 +1,19 @@
+# 静态资源：强缓存一年（CSS/JS/图标/字体等）
+/css/*
+  Cache-Control: public, max-age=31536000, immutable
+/js/*
+  Cache-Control: public, max-age=31536000, immutable
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/admin/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML：协商缓存（1小时强缓存 + ETag）
+/index.html
+  Cache-Control: public, max-age=3600
+/
+  Cache-Control: public, max-age=3600
+/admin.html
+  Cache-Control: public, max-age=3600
+/success.html
+  Cache-Control: public, max-age=3600
