@@ -209,8 +209,9 @@ main{padding:28px 0 60px;}
 .feed-card{background:var(--color-surface);border:1px solid var(--color-card-border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--color-card-shadow);transition:all .4s var(--ease-out);cursor:pointer;display:flex;flex-direction:column;animation:cardIn .5s var(--ease-out) both;}
 @keyframes cardIn{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
 .feed-card:hover{transform:translateY(-4px);box-shadow:var(--color-float-shadow);border-color:var(--color-line-strong);}
-.card-thumb{position:relative;aspect-ratio:16/10;overflow:hidden;background:var(--color-paper) center/cover no-repeat;transition:background-size .6s var(--ease-out);}
-.feed-card:hover .card-thumb{background-size:118% 118%;}
+.card-thumb{position:relative;height:160px;overflow:hidden;background:var(--color-paper);}
+.card-thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s var(--ease-out);}
+.feed-card:hover .card-thumb img{transform:scale(1.06);}
 .card-thumb-tone{position:absolute;inset:0;opacity:.18;mix-blend-mode:multiply;}
 .tone-ai .card-thumb-tone{background:linear-gradient(135deg,var(--tone-ai-1),var(--tone-ai-2));}
 .tone-tools .card-thumb-tone{background:linear-gradient(135deg,var(--tone-tools-1),var(--tone-tools-2));}
@@ -288,7 +289,8 @@ main{padding:28px 0 60px;}
 .modal-body{padding:22px;}
 
 /* 商品详情 / 购买 */
-.detail-cover{width:100%;aspect-ratio:16/9;border-radius:12px;background:var(--color-paper) center/cover no-repeat;margin-bottom:16px;}
+.detail-cover{width:100%;height:200px;border-radius:12px;background:var(--color-paper);overflow:hidden;margin-bottom:16px;}
+.detail-cover img{width:100%;height:100%;object-fit:cover;display:block;}
 .detail-meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
 .detail-desc{color:var(--color-ink-mid);line-height:1.8;font-size:14px;margin-bottom:16px;white-space:pre-wrap;}
 .detail-price{display:flex;align-items:baseline;gap:8px;margin-bottom:14px;}
