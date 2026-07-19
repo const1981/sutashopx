@@ -90,20 +90,25 @@ async function afterLogin() {
 }
 
 // ---------- 导航 ----------
-const TITLES = { overview: '概览', products: '商品管理', orders: '订单管理', banners: '幻灯片管理', gateways: '支付配置', categories: '分类管理', machine: '机器批量', aiapi: 'AI 接口', settings: '站点设置' };
+const TITLES = { overview: '概览', categories: '分类管理', products: '商品管理', orders: '订单管理', coupons: '折扣码管理', gateways: '支付配置', emailconf: '邮件管理', settings: '站点设置', security: '安全设置', files: '文件管理', profile: '个人资料', banners: '幻灯片管理', machine: '机器批量', aiapi: 'AI 接口' };
 function switchTab(tab) {
   $$('#adminNav button[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   $$('.admin-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
-  $('#adminTitle').textContent = TITLES[tab];
+  $('#adminTitle').textContent = TITLES[tab] || tab;
   if (tab === 'overview') renderOverview();
   if (tab === 'products') renderProducts();
   if (tab === 'orders') renderOrders();
-  if (tab === 'banners') renderBanners();
-  if (tab === 'gateways') renderGateways();
   if (tab === 'categories') renderCategories();
+  if (tab === 'coupons') renderCoupons();
+  if (tab === 'gateways') renderGateways();
+  if (tab === 'emailconf') renderEmailConf();
+  if (tab === 'settings') renderSettings();
+  if (tab === 'security') renderSecurity();
+  if (tab === 'files') renderFiles();
+  if (tab === 'profile') renderProfile();
+  if (tab === 'banners') renderBanners();
   if (tab === 'machine') renderMachine();
   if (tab === 'aiapi') renderAiApi();
-  if (tab === 'settings') renderSettings();
 }
 $('#adminNav').onclick = (e) => { const b = e.target.closest('button[data-tab]'); if (b) { switchTab(b.dataset.tab); if (window.innerWidth <= 760) closeAdminSide(); } };
 function openAdminSide() { $('#adminSide').classList.add('open'); $('#adminMask').classList.add('open'); }
@@ -709,6 +714,229 @@ async function openCatForm(id) {
     if (!payload.name || !payload.slug) { toast('请填写名称和标识'); return; }
     const r = id ? await api('/api/admin/categories/' + id, 'PUT', payload) : await api('/api/admin/categories', 'POST', payload);
     if (r.ok) { toast('已保存'); closeModal(); renderCategories(); } else toast(r.data.error || '保存失败');
+  };
+}
+
+// ---------- 折扣码管理 ----------
+async function renderCoupons() {
+  const r = await api('/api/admin/coupons');
+  if (!r.ok) return;
+  const items = r.data.items || [];
+  const rows = items.length ? items.map(c => {
+    const expText = c.expires_at > 0 ? new Date(c.expires_at * 1000).toLocaleString('zh-CN') : '永不过期';
+    const useTxt = c.max_uses > 0 ? `${c.used_count}/${c.max_uses}` : `${c.used_count}次(不限)`;
+    return `<tr>
+      <td><b>${esc(c.code)}</b></td>
+      <td><span class="badge ${c.type === 'percent' ? 'badge-blue' : 'badge-green'}">${c.type === 'percent' ? c.value + '% off' : '¥' + (c.value / 100).toFixed(2) + ' off'}</span></td>
+      <td>≥¥${(c.min_order / 100).toFixed(2)}</td>
+      <td>${useTxt}</td>
+      <td>${expText}</td>
+      <td><span class="badge ${c.enabled ? 'badge-green' : 'badge-gray'}">${c.enabled ? '启用' : '禁用'}</span></td>
+      <td><div class="row-actions">
+        <button class="mini-btn" data-act="edit" data-id="${c.id}">编辑</button>
+        <button class="mini-btn danger" data-act="del" data-id="${c.id}">删除</button>
+      </div></td></tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">还没有折扣码</td></tr>';
+  $('#panel-coupons').innerHTML = `
+    <div class="toolbar"><div class="grow"></div><button class="btn btn-primary" id="addCoupon">+ 新建折扣码</button></div>
+    <div class="table-card"><table class="data">
+      <tr><th>码</th><th>优惠</th><th>最低消费</th><th>使用次数</th><th>过期时间</th><th>状态</th><th>操作</th></tr>${rows}</table></div>`;
+  $('#addCoupon').onclick = () => openCouponForm(null);
+  $$('#panel-coupons [data-act]').forEach(b => {
+    const id = +b.dataset.id;
+    if (b.dataset.act === 'edit') b.onclick = () => openCouponForm(id);
+    if (b.dataset.act === 'del') b.onclick = async () => { if (!confirm('删除该折扣码？')) return; const r2 = await api('/api/admin/coupons/' + id, 'DELETE'); if (r2.ok) { toast('已删除'); renderCoupons(); } else toast(r2.data.error || '删除失败'); };
+  });
+}
+function fmtDateInput(ts) { if (!ts) return ''; const d = new Date(ts * 1000); return d.toISOString().slice(0,16); }
+async function openCouponForm(id) {
+  let c = null; if (id) { const r = await api('/api/admin/coupons/' + id); if (r.ok) c = r.data; }
+  openModal(id ? '编辑折扣码' : '新建折扣码', `
+    <div class="field"><label>折扣码 *</label><input id="cp_code" value="${c ? esc(c.code) : ''}" placeholder="如 SAVE20（大写）" ${c ? 'readonly' : ''}></div>
+    <div style="display:flex;gap:10px;">
+      <div class="field" style="flex:1;"><label>类型 *</label><select id="cp_type">
+        <option value="percent"${!c || c.type === 'percent' ? ' selected' : ''}>百分比减免（如 20% off）</option>
+        <option value="fixed"${c && c.type === 'fixed' ? ' selected' : ''}>固定金额减免（如 ¥10 off）</option>
+      </select></div>
+      <div class="field" style="flex:1;"><label>优惠值 *</label><input id="cp_value" type="number" value="${c ? c.value : ''}" placeholder="${c?.type === 'fixed' ? '单位：分，如 1000=¥10' : '百分比，如 20=20%'}"></div>
+    </div>
+    <div class="field"><label>最低订单金额（元，0=不限）</label><input id="cp_min" type="number" value="${c ? c.min_order / 100 : 0}" step="0.01" min="0"></div>
+    <div class="field"><label>最大使用次数（0=不限）</label><input id="cp_max" type="number" value="${c ? c.max_uses : 0}" min="0"></div>
+    <div class="field"><label>过期时间（留空=永不过期）</label><input id="cp_exp" type="datetime-local" value="${c ? fmtDateInput(c.expires_at) : ''}"></div>
+    <div class="field"><label>状态</label><select id="cp_en"><option value="1"${!c || c.enabled ? ' selected' : ''}>启用</option><option value="0"${c && !c.enabled ? ' selected' : ''}>禁用</option></select></div>
+    <div style="display:flex;gap:10px;margin-top:10px;">
+      <button class="btn btn-primary" id="cp_save" style="flex:1;justify-content:center;padding:11px;">保存</button>
+      <button class="btn" id="cp_cancel" style="flex:1;justify-content:center;padding:11px;">取消</button>
+    </div>`, true);
+  $('#cp_cancel').onclick = closeModal;
+  $('#cp_save').onclick = async () => {
+    const code = $('#cp_code').value.trim().toUpperCase();
+    if (!code) { toast('请填写折扣码'); return; }
+    const type = $('#cp_type').value;
+    const val = parseInt($('#cp_value').value, 10);
+    if (isNaN(val) || val < 0) { toast('优惠值必须 ≥0'); return; }
+    const payload = { code, type, value: val, min_order: Math.round(parseFloat($('#cp_min').value || 0) * 100) || 0, max_uses: parseInt($('#cp_max').value || 0, 10) || 0, expires_at: $('#cp_exp').value || '', enabled: $('#cp_en').value === '1' ? 1 : 0 };
+    const r = id ? await api('/api/admin/coupons/' + id, 'PUT', payload) : await api('/api/admin/coupons', 'POST', payload);
+    if (r.ok) { toast('已保存'); closeModal(); renderCoupons(); } else toast(r.data.error || '保存失败');
+  };
+}
+
+// ---------- 邮件管理 ----------
+async function renderEmailConf() {
+  const r = await api('/api/admin/email/config');
+  const cfg = r.ok ? r.data : {};
+  $('#panel-emailconf').innerHTML = `
+    <div class="table-card" style="padding:22px;max-width:640px;">
+      <h3 style="margin:0 0 14px;font-size:15px;">SMTP 配置</h3>
+      <p style="color:var(--color-ink-soft);font-size:12px;margin-bottom:16px;line-height:1.6;">
+        配置 SMTP 发信参数后可用于订单通知等场景。当前 Cloudflare Workers 环境不支持原生 Socket 连接，
+        建议接入 <b>SendGrid / Resend / Mailchannels API</b> 进行实际发信。此处仅存储配置供后续对接使用。
+      </p>
+      <div class="field"><label>SMTP 主机</label><input id="em_host" value="${esc(cfg.host || '')}" placeholder="smtp.example.com"></div>
+      <div style="display:flex;gap:10px;">
+        <div class="field" style="flex:1;"><label>端口</label><input id="em_port" type="number" value="${cfg.port || 587}" placeholder="587"></div>
+        <div class="field" style="flex:1.5;"><label>发件人地址</label><input id="em_from" value="${esc(cfg.from || '')}" placeholder="noreply@yourshop.com"></div>
+      </div>
+      <div class="field"><label>发件人名称</label><input id="em_fname" value="${esc(cfg.from_name || '')}" placeholder="SutaShopX"></div>
+      <div class="field"><label>用户名</label><input id="em_user" value="${esc(cfg.user || '')}"></div>
+      <div class="field"><label>密码 / API Key</label><input id="em_pass" type="password" value="${cfg.pass ? '••••••' : ''}" placeholder="留空则不修改"></div>
+      <div class="field"><label>安全连接（TLS/SSL）</label><select id="em_sec"><option value="1"${cfg.secure ? ' selected' : ''}>是（推荐）</option><option value="0"${!cfg.secure ? ' selected' : ''}>否</option></select></div>
+      <div style="display:flex;gap:10px;margin-top:12px;">
+        <button class="btn btn-primary" id="em_save" style="flex:1;justify-content:center;padding:11px;">保存配置</button>
+        <button class="btn" id="em_test" style="flex:1;justify-content:center;padding:11px;">发送测试邮件</button>
+      </div>
+      <div id="em_result" style="margin-top:10px;display:none;"></div>
+    </div>`;
+  $('#em_save').onclick = async () => {
+    const passVal = $('#em_pass').value;
+    const payload = { host: $('#em_host').value.trim(), port: $('#em_port').value, user: $('#em_user').value.trim(), from: $('#em_from').value.trim(), from_name: $('#em_fname').value.trim(), secure: $('#em_sec').value === '1' };
+    if (passVal && passVal !== '••••••') payload.pass = passVal;
+    // 如果密码没改（还是占位符），不传 pass 字段
+    if (passVal === '••••••') delete payload.pass;
+    const r = await api('/api/admin/email/config', 'PUT', payload);
+    if (r.ok) { toast('邮件配置已保存'); } else { toast(r.data.error || '保存失败'); }
+  };
+  $('#em_test').onclick = async () => {
+    const to = prompt('请输入测试收件人邮箱：');
+    if (!to) return;
+    const r = await api('/api/admin/email/test', 'POST', { to });
+    const el = $('#em_result'); el.style.display = 'block';
+    if (r.ok) { el.innerHTML = '<div style="color:green;padding:8px;background:#f0fdf4;border-radius:8px;font-size:13px;">✅ ' + (r.data.note || '测试请求已发送') + '</div>'; }
+    else { el.innerHTML = '<div style="color:red;padding:8px;background:#fef2f2;border-radius:8px;font-size:13px;">✗ ' + (r.data.error || '发送失败') + '</div>'; }
+  };
+}
+
+// ---------- 安全设置 ----------
+async function renderSecurity() {
+  const r = await api('/api/admin/security');
+  const cfg = r.ok ? r.data : { max_attempts: 5, lockout_minutes: 15 };
+  $('#panel-security').innerHTML = `
+    <div class="table-card" style="padding:22px;max-width:640px;">
+      <h3 style="margin:0 0 14px;font-size:15px;">登录保护</h3>
+      <p style="color:var(--color-ink-soft);font-size:12px;margin-bottom:16px;">设置连续登录失败后的锁定策略。</p>
+      <div style="display:flex;gap:10px;">
+        <div class="field" style="flex:1;"><label>最大失败次数</label><input id="sec_attempts" type="number" value="${cfg.max_attempts || 5}" min="1" max="20"></div>
+        <div class="field" style="flex:1;"><label>锁定时长（分钟）</label><input id="sec_lockout" type="number" value="${cfg.lockout_minutes || 15}" min="1" max="1440"></div>
+      </div>
+      <button class="btn btn-primary" id="sec_save" style="width:100%;justify-content:center;padding:11px;margin-top:10px;">保存安全设置</button>
+      <hr style="border:none;border-top:1px solid var(--color-line);margin:24px 0 16px;">
+      <h3 style="margin:0 0 14px;font-size:15px;">最近操作日志</h3>
+      <div id="sec_logs"></div>
+    </div>`;
+  $('#sec_save').onclick = async () => {
+    const r = await api('/api/admin/security', 'PUT', { max_attempts: parseInt($('#sec_attempts').value, 10), lockout_minutes: parseInt($('#sec_lockout').value, 10) });
+    if (r.ok) { toast('安全设置已保存'); } else { toast(r.data.error || '保存失败'); }
+  };
+  // 加载日志
+  const lr = await api('/api/admin/logs?limit=20');
+  const logs = lr.ok ? (lr.data.items || []) : [];
+  const logEl = $('#sec_logs');
+  if (logs.length) {
+    logEl.innerHTML = '<div class="table-card"><table class="data"><tr><th>时间</th><th>管理员</th><th>操作</th><th>对象</th><th>详情</th></tr>' +
+      logs.map(l => `<tr><td>${new Date(l.created_at * 1000).toLocaleString('zh-CN')}</td><td>${esc(l.nickname || l.username)}</td><td>${l.action}</td><td>${l.target_type || '-'}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(l.detail || '-')}</td></tr>`).join('') + '</table></div>';
+  } else {
+    logEl.innerHTML = '<div class="empty">暂无操作日志</div>';
+  }
+}
+
+// ---------- 文件管理 ----------
+async function renderFiles() {
+  const r = await api('/api/admin/media');
+  if (!r.ok) return;
+  const items = r.data.items || [];
+  const rows = items.length ? items.map(m => {
+    const isImg = (m.content_type || '').startsWith('image/');
+    const sizeKB = m.size ? (m.size / 1024).toFixed(1) : '?';
+    return `<tr>
+      <td>${isImg ? `<img src="/file/${esc(m.r2_key)}" style="width:48px;height:36px;object-fit:cover;border-radius:4px;border:1px solid var(--color-line);" loading="lazy">` : '<span style="font-size:20px;">📄</span>'}</td>
+      <td title="${esc(m.r2_key)}">${esc(m.filename || m.r2_key.split('/').pop())}</td>
+      <td>${m.content_type || '-'}</td>
+      <td>${sizeKB} KB</td>
+      <td>${new Date(m.created_at * 1000).toLocaleDateString('zh-CN')}</td>
+      <td>${isImg ? `<a href="/file/${esc(m.r2_key)}" target="_blank" class="mini-btn">预览</a>` : ''}
+        <button class="mini-btn danger" data-del="${esc(m.r2_key)}">删除</button></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty">还没有上传文件</td></tr>';
+  $('#panel-files').innerHTML = `
+    <div class="toolbar">
+      <div class="grow"><span style="font-size:13px;color:var(--color-ink-soft);">共 ${items.length} 个文件 · 存储于 R2</span></div>
+      <label class="btn btn-primary" style="cursor:pointer;padding:9px 18px;">📤 上传文件
+        <input type="file" id="fileUpload" style="display:none;" multiple accept="*/*">
+      </label>
+    </div>
+    <div class="table-card"><table class="data">
+      <tr><th>预览</th><th>文件名</th><th>类型</th><th>大小</th><th>上传时间</th><th>操作</th></tr>${rows}</table></div>`;
+  // 上传
+  $('#fileUpload').onchange = async (e) => {
+    const files = e.target.files;
+    if (!files.length) return;
+    for (const f of files) await uploadToR2(f);
+    $('#fileUpload').value = '';
+    toast('上传完成'); renderFiles();
+  };
+  // 删除
+  $$('#panel-files [data-del]').forEach(btn => btn.onclick = async () => {
+    if (!confirm('确定删除该文件？')) return;
+    const key = btn.dataset.del;
+    const dr = await api('/api/admin/media', 'DELETE', { key });
+    if (dr.ok) { toast('已删除'); renderFiles(); } else toast(dr.data.error || '删除失败');
+  });
+}
+
+// ---------- 个人资料 ----------
+let _meData = null;
+async function renderProfile() {
+  const r = await api('/api/admin/me');
+  if (!r.ok) return;
+  _meData = r.data.admin;
+  $('#panel-profile').innerHTML = `
+    <div class="table-card" style="padding:22px;max-width:520px;">
+      <h3 style="margin:0 0 16px;font-size:15px;">个人资料</h3>
+      <div class="field"><label>用户名</label><input value="${esc(_meData.username)}" readonly style="background:var(--color-surface-soft);"></div>
+      <div class="field"><label>昵称</label><input id="pf_nick" value="${esc(_meData.nickname || '')}" placeholder="显示在后台的名称"></div>
+      <button class="btn btn-primary" id="pf_save" style="width:100%;justify-content:center;padding:11px;margin-top:4px;">更新昵称</button>
+      <hr style="border:none;border-top:1px solid var(--color-line);margin:24px 0 16px;">
+      <h3 style="margin:0 0 14px;font-size:15px;">修改密码</h3>
+      <div class="field"><label>当前密码</label><input id="pf_oldpw" type="password" placeholder="输入当前密码"></div>
+      <div class="field"><label>新密码</label><input id="pf_newpw" type="password" placeholder="至少6位"></div>
+      <div class="field"><label>确认新密码</label><input id="pf_newpw2" type="password" placeholder="再次输入新密码"></div>
+      <button class="btn" id="pf_pwsave" style="width:100%;justify-content:center;padding:11px;margin-top:4px;">修改密码</button>
+      <div id="pf_msg" style="margin-top:10px;display:none;"></div>
+    </div>`;
+  $('#pf_save').onclick = async () => {
+    const nick = $('#pf_nick').value.trim();
+    const r = await api('/api/admin/profile', 'PUT', { nickname: nick });
+    if (r.ok) { toast('昵称已更新'); $('#adminUser').textContent = '你好，' + (nick || _meData.username); } else { toast(r.data.error || '更新失败'); }
+  };
+  $('#pf_pwsave').onclick = async () => {
+    const oldPw = $('#pf_oldpw').value; const newPw = $('#pf_newpw').value; const newPw2 = $('#pf_newpw2').value;
+    if (!oldPw || !newPw) { toast('请填写当前密码和新密码'); return; }
+    if (newPw.length < 6) { toast('新密码至少6位'); return; }
+    if (newPw !== newPw2) { toast('两次输入的新密码不一致'); return; }
+    const r = await api('/api/admin/password', 'PUT', { oldPassword: oldPw, newPassword: newPw });
+    const el = $('#pf_msg'); el.style.display = 'block';
+    if (r.ok) { el.innerHTML = '<div style="color:green;padding:8px;background:#f0fdf4;border-radius:8px;font-size:13px;">✅ 密码修改成功</div>'; $('#pf_oldpw').value='';$('#pf_newpw').value='';$('#pf_newpw2').value=''; }
+    else { el.innerHTML = '<div style="color:red;padding:8px;background:#fef2f2;border-radius:8px;font-size:13px;">✗ ' + (r.data.error || '修改失败') + '</div>'; }
   };
 }
 

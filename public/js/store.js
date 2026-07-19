@@ -175,7 +175,7 @@ async function loadProducts() {
         : (p.availableStock <= 0 ? '<span class="stock-hint stock-low">已售罄</span>'
           : (p.availableStock <= 5 ? `<span class="stock-hint stock-low">仅剩 ${p.availableStock} 件</span>` : `<span class="stock-hint">库存 ${p.availableStock}</span>`));
       const soldOut = p.stock_mode !== 'UNLIMITED' && p.availableStock <= 0;
-      return `<article class="feed-card ${tone}" data-id="${p.id}" style="animation-delay:${i * 50}ms">
+      return `<article class="feed-card ${tone}${soldOut ? ' sold-out' : ''}" data-id="${p.id}" style="animation-delay:${i * 50}ms">
         <div class="card-thumb"><div class="card-thumb-tone"></div>
           <img loading="lazy" decoding="async" src="${p.cover_image || makeCover('p' + p.id, p.category_slug)}" alt="${p.name}">
           <span class="card-type-badge">${p.category_name || '商品'}</span>
@@ -192,11 +192,13 @@ async function loadProducts() {
     }).join('');
     // 手机端（≤820px）直接跳转到独立购买页，避免弹窗在部分内核上不弹出
     $$('#feedGrid .feed-card').forEach(c => c.onclick = () => {
+      if (c.classList.contains('sold-out')) { toast('该商品已售罄，暂时无法购买'); return; }
       if (window.matchMedia('(max-width: 820px)').matches) { location.href = 'buy.html?id=' + c.dataset.id; return; }
       openDetail(+c.dataset.id);
     });
     $$('#feedGrid .buy-btn').forEach(b => b.onclick = (e) => {
       e.stopPropagation();
+      if (b.disabled) return;
       if (window.matchMedia('(max-width: 820px)').matches) { location.href = 'buy.html?id=' + b.dataset.id; return; }
       openDetail(+b.dataset.id);
     });
@@ -226,6 +228,7 @@ async function openDetail(id) {
   const min = product.min_buy || 1, max = product.max_buy || 1;
   $('#modalTitle').textContent = product.name;
   const stockTxt = product.stock_mode === 'UNLIMITED' ? '库存充足' : `库存 ${product.availableStock ?? product.stock}`;
+  const soldOut = product.stock_mode !== 'UNLIMITED' && (product.availableStock ?? product.stock) <= 0;
   $('#modalBody').innerHTML = `
     <div class="detail-cover"><img src="${product.cover_image || makeCover('p' + product.id, product.category_slug)}" alt="${product.name}"></div>
     <div class="detail-meta">
@@ -236,6 +239,7 @@ async function openDetail(id) {
     <p class="detail-desc">${product.description || product.subtitle || '暂无描述'}</p>
     <div class="detail-price"><span class="price">${money(product.price)}</span><span class="stock-hint">/ 件</span></div>
     <div class="contact-row"><input id="contactInput" type="text" placeholder="联系方式 * 必填（邮箱/微信，用于发货与售后）"></div>
+    <div class="contact-row"><input id="couponInput" type="text" placeholder="折扣码（选填）"></div>
     <div class="qty-row"><label>购买数量</label>
       <div class="qty-ctrl">
         <button id="qtyMinus">−</button>
@@ -247,7 +251,7 @@ async function openDetail(id) {
     <div class="buy-action">
       ${GATEWAYS.length ? `<div class="gw-select"><label>支付方式</label><select id="gwSelect">${GATEWAYS.map(g => `<option value="${g.id}">${g.display_name}</option>`).join('')}</select></div>` : ''}
       <span class="total">合计：<b id="totalPrice">${money(product.price * min)}</b></span>
-      <button class="btn btn-primary" id="buyNow" style="padding:11px 26px;">去支付</button>
+      <button class="btn btn-primary" id="buyNow" style="padding:11px 26px;" ${soldOut ? 'disabled' : ''}>${soldOut ? '已售罄' : '去支付'}</button>
     </div>
     ${product.purchase_note ? `<p style="font-size:12px;color:var(--color-ink-soft);margin-top:12px;">${product.purchase_note}</p>` : ''}`;
 
@@ -260,7 +264,7 @@ async function openDetail(id) {
   $('#qtyMinus').onclick = () => { $('#qtyInput').value = qty - 1; sync(); };
   $('#qtyPlus').onclick = () => { $('#qtyInput').value = qty + 1; sync(); };
   $('#qtyInput').oninput = sync;
-  $('#buyNow').onclick = () => buy(product, qty);
+  $('#buyNow').onclick = () => { if (soldOut) { toast('该商品已售罄'); return; } buy(product, qty); };
   openModal();
 }
 
@@ -272,7 +276,7 @@ async function buy(product, qty) {
     const r = await fetch('/api/checkout', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ productId: product.id, quantity: qty, contact: $('#contactInput').value.trim(), gateway: $('#gwSelect') ? $('#gwSelect').value : 0 }),
+      body: JSON.stringify({ productId: product.id, quantity: qty, contact: $('#contactInput').value.trim(), coupon: $('#couponInput') ? $('#couponInput').value.trim() : '', gateway: $('#gwSelect') ? $('#gwSelect').value : 0 }),
     });
     const data = await r.json();
     if (!r.ok) { toast(data.error || '下单失败'); $('#buyNow').disabled = false; $('#buyNow').textContent = '去支付'; return; }

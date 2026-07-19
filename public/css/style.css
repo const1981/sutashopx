@@ -342,6 +342,9 @@ main{padding:28px 0 60px;}
 .admin-nav button{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;color:var(--color-ink-mid);font-weight:500;font-size:14px;text-align:left;transition:all .24s var(--ease-out);}
 .admin-nav button:hover{background:var(--color-surface-soft);color:var(--color-ink-strong);}
 .admin-nav button.active{background:linear-gradient(135deg,var(--color-accent-strong),var(--color-accent-cool));color:#fff;}
+/* 导航分组标签 */
+.nav-group{padding:14px 0 6px;}
+.nav-label{font-size:11px;font-weight:700;color:var(--color-ink-soft);text-transform:uppercase;letter-spacing:1px;padding-left:14px;}
 .admin-nav .spacer{margin-top:auto;}
 .admin-menu-btn{display:none;flex-direction:column;gap:4px;width:38px;height:38px;border-radius:10px;background:var(--color-surface-soft);border:1px solid var(--color-line);align-items:center;justify-content:center;flex-shrink:0;}
 .admin-menu-btn span{display:block;width:18px;height:1.5px;background:var(--color-ink-mid);border-radius:2px;}

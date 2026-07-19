@@ -439,5 +439,66 @@ ok('key_set=true(测试环境已设 AI_API_KEY)', d.data && d.data.key_set === t
 ok('返回完整 key(登录态可见)', d.data && d.data.key_full === 'test-machine-key-123', d.data && d.data.key_full);
 ok('返回 4 个接口清单', d.data && Array.isArray(d.data.endpoints) && d.data.endpoints.length === 4, d.data && d.data.endpoints);
 
+// 25. 新功能回归：折扣码 / 安全设置 / 邮件配置 / 操作日志 / 个人资料
+// 25.1 后台创建折扣码（百分比 20%）
+r = await worker.fetch(req('POST', '/api/admin/coupons', { code: 'TEST20', type: 'percent', value: 20 }, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('创建折扣码成功', r.status === 200 && d.data.id, d.data);
+const cpnId = d.data.id;
+r = await worker.fetch(req('GET', '/api/admin/coupons', null, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('折扣码列表含 TEST20', d.data.items.some(c => c.code === 'TEST20'), d.data.items.length);
+
+// 25.2 下单使用折扣码 -> 金额打折 + 记录 coupon_code + used_count 自增
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, contact: 'buyer@test.com', coupon: 'test20' }), env, ctx);
+d = await jr(r);
+ok('带折扣码下单成功', r.status === 200 && d.data.orderNo, d.data);
+const cpnOrder = d.data.orderNo, cpnToken = d.data.token;
+r = await worker.fetch(req('GET', `/api/orders/${cpnOrder}?token=${cpnToken}`), env, ctx);
+d = await jr(r);
+ok('订单记录了 coupon_code(大写归一)', d.data.order.coupon_code === 'TEST20', d.data.order.coupon_code);
+ok('折扣后金额 < 原价', d.data.order.amount < d.data.order.unit_price * d.data.order.quantity, `${d.data.order.amount} < ${d.data.order.unit_price * d.data.order.quantity}`);
+r = await worker.fetch(req('POST', '/api/pay/demo', { orderNo: cpnOrder }), env, ctx);
+r = await worker.fetch(req('GET', '/api/admin/coupons/' + cpnId, null, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('支付后折扣码 used_count 自增为 1', d.data.used_count === 1, d.data.used_count);
+
+// 25.3 无效折扣码被拒
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, contact: 'buyer@test.com', coupon: 'NOPE' }), env, ctx);
+ok('无效折扣码下单被拒', r.status !== 200, r.status);
+
+// 25.4 安全设置 GET/PUT 往返
+r = await worker.fetch(req('GET', '/api/admin/security', null, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('安全设置 GET 返回默认值', r.status === 200 && typeof d.data.max_attempts === 'number', d.data);
+r = await worker.fetch(req('PUT', '/api/admin/security', { max_attempts: 8, lockout_minutes: 30 }, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('安全设置 PUT 成功', r.status === 200, d.data);
+r = await worker.fetch(req('GET', '/api/admin/security', null, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('安全设置已更新(max_attempts=8)', d.data.max_attempts === 8 && d.data.lockout_minutes === 30, d.data);
+
+// 25.5 邮件配置 GET/PUT（存于 kv 表 key=mail_smtp）
+r = await worker.fetch(req('PUT', '/api/admin/email/config', { host: 'smtp.test.com', port: 465, user: 'noreply@test.com', pass: 'pw', from: 'noreply@test.com', from_name: 'SutaShopX' }, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('邮件配置 PUT 成功', r.status === 200, d.data);
+r = await worker.fetch(req('GET', '/api/admin/email/config', null, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('邮件配置 GET 回读 host', d.data.host === 'smtp.test.com', d.data);
+
+// 25.6 操作日志（登录已写入）
+r = await worker.fetch(req('GET', '/api/admin/logs', null, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('操作日志列表非空', Array.isArray(d.data.items) && d.data.items.length >= 1, d.data.items && d.data.items.length);
+ok('日志含 action=login 记录', d.data.items.some(l => l.action === 'login'), d.data.items[0]);
+
+// 25.7 个人资料 nickname 更新 + /api/admin/me 回读
+r = await worker.fetch(req('PUT', '/api/admin/profile', { nickname: '管理员甲' }, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('个人资料更新成功', r.status === 200, d.data);
+r = await worker.fetch(req('GET', '/api/admin/me', null, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+ok('me 回读 nickname=管理员甲', d.data.admin.nickname === '管理员甲', d.data.admin);
+
 console.log(`\n集成测试结果：通过 ${pass} / 失败 ${fail}`);
 process.exit(fail ? 1 : 0);

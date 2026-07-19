@@ -467,6 +467,15 @@ async function insertId(env, sql, ...params) {
   return r.meta && r.meta.last_row_id;
 }
 
+// ---------- 操作日志 ----------
+async function logAdmin(env, adminId, action, targetType, targetId, detail) {
+  try {
+    const ip = ''; // Workers 中获取真实 IP 受限于代理，暂留空
+    await run(env, 'INSERT INTO admin_logs (admin_id,action,target_type,target_id,detail,ip,created_at) VALUES (?,?,?,?,?,?,?)',
+      adminId, action, targetType || null, targetId || null, detail || null, ip, nowSec());
+  } catch { /* 日志失败不阻断主流程 */ }
+}
+
 // ---------- Cookie ----------
 function getCookie(req, name) {
   const c = req.headers.get('Cookie');
@@ -772,6 +781,10 @@ async function markPaid(env, order, provider, paymentOrderNo) {
     "UPDATE orders SET status='PAID', payment_provider=?, payment_order_no=?, paid_at=? WHERE id=?",
     provider, paymentOrderNo, nowSec(), order.id
   );
+  // 折扣码使用次数 +1
+  if (order.coupon_code) {
+    await run(env, "UPDATE coupons SET used_count=used_count+1 WHERE code=?", order.coupon_code);
+  }
   const res = await deliverOrder(env, order);
   await sendFeishu(env, order, provider, res);
   return res;
@@ -1053,10 +1066,54 @@ async function serveFile(env, key) {
     });
   } catch (e) { return jsonErr('读取文件失败: ' + e.message, 500); }
 }
+// 自举式结构迁移：保证 coupons / admin_logs 表与 orders.coupon_code 列存在。
+// 幂等可重复执行；线上 Worker 冷启动时自动跑一次，免去手动 wrangler d1 execute。
+let __schemaReady = false;
+async function ensureSchema(env) {
+  if (__schemaReady) return;
+  try {
+    await run(env, `CREATE TABLE IF NOT EXISTS coupons (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      code        TEXT UNIQUE NOT NULL,
+      type        TEXT NOT NULL DEFAULT 'percent',
+      value       INTEGER NOT NULL DEFAULT 0,
+      min_order   INTEGER NOT NULL DEFAULT 0,
+      max_uses    INTEGER NOT NULL DEFAULT 0,
+      used_count  INTEGER NOT NULL DEFAULT 0,
+      expires_at  INTEGER NOT NULL DEFAULT 0,
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      created_at  INTEGER NOT NULL DEFAULT 0
+    )`);
+    await run(env, `CREATE TABLE IF NOT EXISTS admin_logs (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      admin_id    INTEGER NOT NULL,
+      action      TEXT NOT NULL,
+      target_type TEXT,
+      target_id   INTEGER,
+      detail      TEXT,
+      ip          TEXT,
+      created_at  INTEGER NOT NULL DEFAULT 0
+    )`);
+    try {
+      await run(env, 'ALTER TABLE orders ADD COLUMN coupon_code TEXT DEFAULT NULL');
+    } catch (_) { /* 列已存在则忽略 */ }
+    await run(env, `CREATE TABLE IF NOT EXISTS kv (
+      key   TEXT PRIMARY KEY,
+      value TEXT
+    )`);
+    __schemaReady = true;
+  } catch (e) {
+    console.error('ensureSchema failed:', e && e.message);
+  }
+}
+
 async function handleApi(request, env, ctx) {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
+
+  // 自举式结构迁移：首次请求时确保新功能所需的表/列已存在（幂等，可重复执行）
+  await ensureSchema(env);
 
   // ---- 公开：站点配置 ----
   if (path === '/api/config' && method === 'GET') {
@@ -1134,17 +1191,38 @@ async function handleApi(request, env, ctx) {
       if (product.delivery_type === 'CARD_AUTO' && avail < qty) return jsonErr('库存不足');
       if (product.delivery_type !== 'CARD_AUTO' && product.stock < qty) return jsonErr('库存不足');
     }
-    const amount = product.price * qty;
+    let amount = product.price * qty;
+    // 折扣码校验
+    let couponCode = null;
+    if (body.coupon) {
+      const cc = String(body.coupon).trim().toUpperCase();
+      const cpn = await first(env, 'SELECT * FROM coupons WHERE code=?', cc);
+      if (!cpn) return jsonErr('折扣码无效');
+      if (!cpn.enabled) return jsonErr('该折扣码已禁用');
+      if (cpn.expires_at && cpn.expires_at > 0 && nowSec() > cpn.expires_at) return jsonErr('该折扣码已过期');
+      if (cpn.max_uses > 0 && cpn.used_count >= cpn.max_uses) return jsonErr('该折扣码已用完');
+      if (cpn.min_order > 0 && amount < cpn.min_order) return jsonErr(`订单金额不足 ¥${(cpn.min_order / 100).toFixed(2)}，无法使用此折扣码`);
+      // 计算折扣
+      let discount = 0;
+      if (cpn.type === 'percent') {
+        discount = Math.floor(amount * cpn.value / 100);
+      } else { // fixed
+        discount = cpn.value;
+      }
+      discount = Math.min(discount, amount - 1); // 折扣后至少保留 ¥0.01
+      amount -= discount;
+      couponCode = cc;
+    }
     const orderNo = makeOrderNo();
     const token = randHex(16);
     // 选择支付网关：优先用 body.gateway（后台启用的已配置网关），否则回退到 PAYMENT_MODE/Stripe/演示
     const gatewayId = parseInt(body.gateway, 10) || 0;
     const oid = await insertId(
       env,
-      `INSERT INTO orders (order_no, query_token, product_id, product_name, unit_price, quantity, amount, contact_value, status, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?, 'PENDING', ?, ?)`,
+      `INSERT INTO orders (order_no, query_token, product_id, product_name, unit_price, quantity, amount, contact_value, coupon_code, status, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?, 'PENDING', ?, ?)`,
       orderNo, token, product.id, product.name, product.price, qty, amount,
-      body.contact || null, nowSec(), nowSec()
+      body.contact || null, couponCode, nowSec(), nowSec()
     );
     const order = await first(env, 'SELECT * FROM orders WHERE id=?', oid);
     order.__requrl = request.url;
@@ -1225,7 +1303,8 @@ async function handleApi(request, env, ctx) {
     return json({
       order: {
         order_no: order.order_no, status: order.status, amount: order.amount,
-        quantity: order.quantity, product_name: order.product_name,
+        unit_price: order.unit_price, quantity: order.quantity,
+        coupon_code: order.coupon_code || '', product_name: order.product_name,
         payment_provider: order.payment_provider, created_at: order.created_at,
         delivery_note: order.delivery_note,
         delivery_type: prod ? prod.delivery_type : '',
@@ -1298,6 +1377,7 @@ async function handleApi(request, env, ctx) {
     const ok = await verifyPassword(env.AUTH_SECRET, admin.username, body.password || '', admin.password_hash);
     if (!ok) return jsonErr('账号或密码错误', 401);
     const token = await signToken(env.AUTH_SECRET, { sub: admin.id, exp: nowSec() + 7 * 86400 });
+    logAdmin(env, admin.id, 'login', 'admin', admin.id, `管理员 ${admin.username} 登录成功`);
     const resp = json({ ok: true, token, admin: { id: admin.id, username: admin.username, nickname: admin.nickname } });
     resp.headers.append(
       'Set-Cookie',
@@ -1761,6 +1841,125 @@ async function handleApi(request, env, ctx) {
   }
   if (m && method === 'DELETE') {
     await run(env, 'DELETE FROM banners WHERE id=?', m[1]);
+    return json({ ok: true });
+  }
+
+  // ---------- 折扣码管理 ----------
+  if (path === '/api/admin/coupons' && method === 'GET') {
+    const items = await all(env, 'SELECT * FROM coupons ORDER BY id DESC');
+    return json({ items });
+  }
+  if (path === '/api/admin/coupons' && method === 'POST') {
+    let b; try { b = await request.json(); } catch { return jsonErr('请求体格式错误'); }
+    if (!b.code || !b.type) return jsonErr('请填写折扣码和类型');
+    if (!['percent','fixed'].includes(b.type)) return jsonErr('类型必须是 percent 或 fixed');
+    const val = parseInt(b.value, 10);
+    if (isNaN(val) || val < 0) return jsonErr('折扣值必须 ≥0');
+    if (b.type === 'percent' && val > 100) return jsonErr('百分比不能超过 100');
+    const expires = b.expires_at ? Math.floor(new Date(b.expires_at).getTime() / 1000) : 0;
+    const id = await insertId(
+      env, 'INSERT INTO coupons (code,type,value,min_order,max_uses,expires_at,enabled,created_at) VALUES (?,?,?,?,?,?,?,?)',
+      b.code.trim().toUpperCase(), b.type, val, parseInt(b.min_order || 0, 10) || 0,
+      parseInt(b.max_uses || 0, 10) || 0, expires, b.enabled === 0 ? 0 : 1, nowSec()
+    );
+    logAdmin(env, admin.id, 'create', 'coupon', id, `创建折扣码 ${b.code}`);
+    return json({ ok: true, id });
+  }
+  let cm = path.match(/^\/api\/admin\/coupons\/(\d+)$/);
+  if (cm && method === 'GET') {
+    const c = await first(env, 'SELECT * FROM coupons WHERE id=?', cm[1]);
+    if (!c) return jsonErr('折扣码不存在', 404);
+    return json({ ...c });
+  }
+  if (cm && method === 'PUT') {
+    let b; try { b = await request.json(); } catch { return jsonErr('请求体格式错误'); }
+    const existing = await first(env, 'SELECT * FROM coupons WHERE id=?', cm[1]);
+    if (!existing) return jsonErr('折扣码不存在', 404);
+    const updates = [];
+    const params = [];
+    if (b.code !== undefined) { updates.push('code=?'); params.push(b.code.trim().toUpperCase()); }
+    if (b.type !== undefined) { if (!['percent','fixed'].includes(b.type)) return jsonErr('类型必须是 percent 或 fixed'); updates.push('type=?'); params.push(b.type); }
+    if (b.value !== undefined) { const v = parseInt(b.value, 10); if (isNaN(v) || v < 0) return jsonErr('折扣值必须 ≥0'); if (b.type === 'percent' && v > 100) return jsonErr('百分比不能超过 100'); updates.push('value=?'); params.push(v); }
+    if (b.min_order !== undefined) { updates.push('min_order=?'); params.push(parseInt(b.min_order, 10) || 0); }
+    if (b.max_uses !== undefined) { updates.push('max_uses=?'); params.push(parseInt(b.max_uses, 10) || 0); }
+    if (b.expires_at !== undefined) { updates.push('expires_at=?'); params.push(b.expires_at ? Math.floor(new Date(b.expires_at).getTime() / 1000) : 0); }
+    if (b.enabled !== undefined) { updates.push('enabled=?'); params.push(b.enabled === 0 ? 0 : 1); }
+    params.push(cm[1]);
+    if (updates.length) { await run(env, 'UPDATE coupons SET ' + updates.join(',') + ' WHERE id=?', ...params); }
+    logAdmin(env, admin.id, 'update', 'coupon', cm[1], `编辑折扣码 ${existing.code}`);
+    return json({ ok: true });
+  }
+  if (cm && method === 'DELETE') {
+    const existing = await first(env, 'SELECT code FROM coupons WHERE id=?', cm[1]);
+    if (!existing) return jsonErr('折扣码不存在', 404);
+    await run(env, 'DELETE FROM coupons WHERE id=?', cm[1]);
+    logAdmin(env, admin.id, 'delete', 'coupon', cm[1], `删除折扣码 ${existing.code}`);
+    return json({ ok: true });
+  }
+
+  // ---------- 个人资料 ----------
+  if (path === '/api/admin/profile' && method === 'PUT') {
+    let b; try { b = await request.json(); } catch { return jsonErr('请求体格式错误'); }
+    if (b.nickname !== undefined) {
+      const n = String(b.nickname).trim();
+      if (n.length > 50) return jsonErr('昵称不能超过50字');
+      await run(env, 'UPDATE admins SET nickname=? WHERE id=?', n, admin.id);
+      logAdmin(env, admin.id, 'update', 'profile', admin.id, `修改昵称`);
+    }
+    return json({ ok: true });
+  }
+
+  // ---------- 邮件配置（存 kv 表，key=mail_smtp） ----------
+  if (path === '/api/admin/email/config' && method === 'GET') {
+    const row = await first(env, "SELECT value FROM kv WHERE key='mail_smtp'");
+    let cfg = {};
+    try { if (row && row.value) cfg = JSON.parse(row.value); } catch {}
+    return json(cfg);
+  }
+  if (path === '/api/admin/email/config' && method === 'PUT') {
+    let b; try { b = await request.json(); } catch { return jsonErr('请求体格式错误'); }
+    const cfg = { host: (b.host||'').trim(), port: parseInt(b.port,10)||587, user: (b.user||'').trim(), pass: (b.pass||'').trim(), from: (b.from||'').trim(), from_name: (b.from_name||'').trim(), secure: b.secure ? 1 : 0 };
+    await run(env, "INSERT INTO kv (key,value) VALUES('mail_smtp',?) ON CONFLICT(key) DO UPDATE set value=?", JSON.stringify(cfg));
+    logAdmin(env, admin.id, 'config', 'settings', null, '更新邮件SMTP配置');
+    return json({ ok: true });
+  }
+  if (path === '/api/admin/email/test' && method === 'POST') {
+    let b; try { b = await request.json(); } catch { return jsonErr('请求体格式错误'); }
+    const to = (b.to || '').trim();
+    if (!to) return jsonErr('请填写收件人地址');
+    // Cloudflare Workers 不支持原生 SMTP；此处仅验证配置是否保存成功并返回提示
+    // 实际发信需依赖 MailChannels 或外部 API（后续可接 SendGrid/Resend）
+    const row = await first(env, "SELECT value FROM kv WHERE key='mail_smtp'");
+    let cfg;
+    try { cfg = row?.value ? JSON.parse(row.value) : null; } catch { cfg = null; }
+    if (!cfg || !cfg.host) return jsonErr('请先配置 SMTP 参数再测试');
+    logAdmin(env, admin.id, 'config', 'email', null, `发送测试邮件到 ${to}`);
+    return json({ ok: true, note: '当前环境暂不支持直接 SMTP 发信（Workers 无 Socket）。已记录配置正确。生产环境建议接入 SendGrid/Resend/Mailchannels API 发信。' });
+  }
+
+  // ---------- 安全设置 / 操作日志 ----------
+  if (path === '/api/admin/logs' && method === 'GET') {
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '50', 10), 200);
+    const items = await all(env,
+      `SELECT l.*, a.username, a.nickname FROM admin_logs l LEFT JOIN admins a ON a.id=l.admin_id ORDER BY l.created_at DESC LIMIT ?`,
+      limit);
+    return json({ items });
+  }
+  if (path === '/api/admin/security' && method === 'GET') {
+    const row = await first(env, "SELECT value FROM kv WHERE key='security'");
+    let cfg = { max_attempts: 5, lockout_minutes: 15 };
+    try { if (row?.value) Object.assign(cfg, JSON.parse(row.value)); } catch {}
+    return json(cfg);
+  }
+  if (path === '/api/admin/security' && method === 'PUT') {
+    let b; try { b = await request.json(); } catch { return jsonErr('请求体格式错误'); }
+    const _ma1 = Math.max(parseInt(b.max_attempts,10) || 5, 1);
+    const _ma2 = Math.min(_ma1, 20);
+    const _lm1 = Math.max(parseInt(b.lockout_minutes,10) || 15, 1);
+    const _lm2 = Math.min(_lm1, 1440);
+    const cfg = { max_attempts: _ma2, lockout_minutes: _lm2 };
+    await run(env, "INSERT INTO kv (key,value) VALUES('security',?) ON CONFLICT(key) DO UPDATE set value=?", JSON.stringify(cfg));
+    logAdmin(env, admin.id, 'config', 'security', null, `更新安全设置: ${JSON.stringify(cfg)}`);
     return json({ ok: true });
   }
 

@@ -140,6 +140,7 @@ function render(p) {
   product = p;
   const min = p.min_buy || 1, max = p.max_buy || 1;
   const stockTxt = p.stock_mode === 'UNLIMITED' ? '库存充足' : `库存 ${p.availableStock ?? p.stock}`;
+  const soldOut = p.stock_mode !== 'UNLIMITED' && (p.availableStock ?? p.stock) <= 0;
   qty = min;
 
   const gwHtml = GATEWAYS.length
@@ -156,6 +157,7 @@ function render(p) {
     <p class="detail-desc">${p.description || p.subtitle || '暂无描述'}</p>
     <div class="detail-price"><span class="price">${money(p.price)}</span><span class="stock-hint">/ 件</span></div>
     <div class="contact-row" style="margin:10px 0 6px;"><input id="contactInput" type="text" placeholder="联系方式 * 必填（邮箱/微信，用于发货与售后）" style="width:100%;padding:11px 14px;border-radius:10px;background:var(--color-paper);border:1px solid var(--color-line);outline:none;"></div>
+    <div class="contact-row" style="margin:6px 0;"><input id="couponInput" type="text" placeholder="折扣码（选填）" style="width:100%;padding:11px 14px;border-radius:10px;background:var(--color-paper);border:1px solid var(--color-line);outline:none;"></div>
     <div class="qty-row" style="margin-bottom:6px;"><label style="width:64px;flex-shrink:0;font-size:13px;color:var(--color-ink-soft);">购买数量</label>
       <div class="qty-ctrl">
         <button id="qtyMinus">−</button>
@@ -168,7 +170,7 @@ function render(p) {
     ${p.purchase_note ? `<p style="font-size:12px;color:var(--color-ink-soft);margin:10px 0 0;">${p.purchase_note}</p>` : ''}
     <div class="buy-foot">
       <span class="total">合计：<b id="totalPrice">${money(p.price * min)}</b></span>
-      <button class="btn btn-primary" id="buyNow">去支付</button>
+      <button class="btn btn-primary" id="buyNow" ${soldOut ? 'disabled' : ''}>${soldOut ? '已售罄' : '去支付'}</button>
     </div>`;
 
   const sync = () => {
@@ -179,7 +181,7 @@ function render(p) {
   $('#qtyMinus').onclick = () => { $('#qtyInput').value = qty - 1; sync(); };
   $('#qtyPlus').onclick  = () => { $('#qtyInput').value = qty + 1; sync(); };
   $('#qtyInput').oninput = sync;
-  $('#buyNow').onclick = () => buy(p, qty);
+  $('#buyNow').onclick = () => { if (soldOut) { toast('该商品已售罄'); return; } buy(p, qty); };
 }
 
 async function buy(p, qty) {
@@ -195,6 +197,7 @@ async function buy(p, qty) {
         productId: p.id,
         quantity: qty,
         contact: ($('#contactInput') ? $('#contactInput').value.trim() : ''),
+        coupon: ($('#couponInput') ? $('#couponInput').value.trim() : ''),
         gateway: ($('#gwSelect') ? $('#gwSelect').value : 0),
       }),
     });
