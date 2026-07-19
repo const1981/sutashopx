@@ -90,13 +90,14 @@ async function afterLogin() {
 }
 
 // ---------- 导航 ----------
-const TITLES = { overview: '概览', categories: '分类管理', products: '商品管理', orders: '订单管理', coupons: '折扣码管理', gateways: '支付配置', emailconf: '邮件管理', settings: '站点设置', security: '安全设置', files: '文件管理', profile: '个人资料', banners: '幻灯片管理', machine: '机器批量', aiapi: 'AI 接口' };
+const TITLES = { overview: '概览', categories: '分类管理', products: '商品管理', cards: '卡密管理', orders: '订单管理', coupons: '折扣码管理', gateways: '支付配置', emailconf: '邮件管理', settings: '站点设置', security: '安全设置', files: '文件管理', profile: '个人资料', banners: '幻灯片管理', machine: '机器批量', aiapi: 'AI 接口' };
 function switchTab(tab) {
   $$('#adminNav button[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   $$('.admin-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
   $('#adminTitle').textContent = TITLES[tab] || tab;
   if (tab === 'overview') renderOverview();
   if (tab === 'products') renderProducts();
+  if (tab === 'cards') renderCards();
   if (tab === 'orders') renderOrders();
   if (tab === 'categories') renderCategories();
   if (tab === 'coupons') renderCoupons();
@@ -337,6 +338,25 @@ async function openKeys(id) {
     const r = await api('/api/admin/cards/' + b.dataset.del, 'DELETE');
     if (r.ok) { toast('已删除'); openKeys(id); renderProducts(); } else toast('删除失败');
   });
+}
+
+// ---------- 卡密管理（顶层菜单，复用 openKeys 模态）----------
+async function renderCards() {
+  const r = await api('/api/admin/products?status=all');
+  if (!r.ok) { $('#panel-cards').innerHTML = '<div class="empty">加载失败</div>'; return; }
+  const items = (r.data.items || []).filter(p => p.delivery_type === 'CARD_AUTO');
+  const rows = items.length ? items.map(p => `<tr>
+    <td><b>${esc(p.name)}</b></td>
+    <td><span class="badge badge-gray">${p.availableStock ?? 0}</span></td>
+    <td><button class="mini-btn" data-keys="${p.id}">卡密</button></td>
+  </tr>`).join('') : '<tr><td colspan="3" class="empty">没有自动发卡类商品</td></tr>';
+  $('#panel-cards').innerHTML = `
+    <div class="table-card" style="max-width:760px;">
+      <h3 style="margin:0 0 6px;font-size:15px;">卡密管理</h3>
+      <p style="color:var(--color-ink-soft);font-size:12px;margin-bottom:14px;">点击「卡密」可一键生成或批量导入卡密（走后台登录态，零外部 key）。</p>
+      <table class="data"><tr><th>自动发卡商品</th><th>剩余卡密</th><th>操作</th></tr>${rows}</table>
+    </div>`;
+  $$('#panel-cards [data-keys]').forEach(b => b.onclick = () => openKeys(parseInt(b.dataset.keys, 10)));
 }
 
 // ---------- 订单 ----------
