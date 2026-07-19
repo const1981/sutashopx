@@ -86,15 +86,17 @@ wrangler deploy
 
 ## 线上状态（已部署并真机测试）
 
-- 商城首页：**https://sutashopx.constlee.workers.dev**
-- 管理后台：**https://sutashopx.constlee.workers.dev/admin.html**
-- **默认管理员：admin / admin123456，首次登录后请立即在「设置」里改密码**
-- 已建资源：D1 `sutashopx-db`、R2 `sutashopx-files`，`AUTH_SECRET` 已注入。
-- **BEpusdt 已真实对接**：后台已配置 AWS API Gateway 网关地址和 App Secret；真机下单成功返回 BEpusdt 收银台链接；构造回调验签通过并自动发货（订单状态 `DELIVERED`、卡密已发出）。
+> ⚠️ **真实线上地址是 `https://shopx.suta.eu.cc/`**（SutaShopX 新版，Cloudflare 自定义域，绑新账号 bb7f + D1 `sutashopx-db`）。`bu31-shop.constlee.workers.dev` 是早期 BU31 **旧版**，数据孤立、不再维护，勿混淆。
 
-部署完成后（首次本地部署）：
-- 商城首页：`https://sutashopx.<你的子域>.workers.dev`
-- 管理后台：`https://sutashopx.<你的子域>.workers.dev/admin.html`
+- 商城首页：**https://shopx.suta.eu.cc/**
+- 管理后台：**https://shopx.suta.eu.cc/admin.html**
+- **默认管理员：admin / admin123456，首次登录后请立即在「设置」里改密码**
+- 已建资源：D1 `sutashopx-db`（新账号）、R2 **已绑定** `clawchat-media`（复用账户内已有桶，2026-07-19 经 `wrangler.toml` 接入）、`AUTH_SECRET` 已注入。
+- **BEpusdt 已真实对接**（旧版 bu31-shop 验证过）：后台配置 AWS API Gateway 网关地址 + App Secret，下单返回收银台、回调自动发货。新版 shopx 当前 **支付网关尚未在后台配置**（`gateways` 列表为空），需在后台「💰 支付配置」启用并填写，否则下单会走演示模式、收不到款。
+
+部署完成后：
+- 商城首页（自定义域）：`https://shopx.suta.eu.cc/`（Worker 默认子域：`https://sutashopx.<你的子域>.workers.dev`）
+- 管理后台：`https://shopx.suta.eu.cc/admin.html`
 - **默认管理员：admin / admin123456，首次登录后请立即在「设置」里改密码**
 
 > ⚠️ 上线必做三件事：

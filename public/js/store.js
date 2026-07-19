@@ -26,18 +26,38 @@ function money(price) {
   return sym + (price / 100).toFixed(2);
 }
 
-// 占位封面（基于分类色生成 SVG），与 SutaShopX 一致
+// #rrggbb → rgb(r,g,b)，避免 SVG 里出现 # 导致部分浏览器 data URI 解析失败
+function hexToRgb(hex) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+    || /^#?([a-f\d])([a-f\d])([a-f\d])$/i.exec(hex);
+  if (!m) return 'rgb(136,136,136)';
+  let r, g, b;
+  if (hex.replace('#', '').length === 3) { r = parseInt(m[1] + m[1], 16); g = parseInt(m[2] + m[2], 16); b = parseInt(m[3] + m[3], 16); }
+  else { r = parseInt(m[1], 16); g = parseInt(m[2], 16); b = parseInt(m[3], 16); }
+  return `rgb(${r},${g},${b})`;
+}
+
+// 占位封面（基于分类色生成 SVG）
+// 用 base64 编码整个 data URI —— 这是所有浏览器（含旧版 Edge、老安卓 WebView、
+// 国产内核）都 100% 支持的格式，彻底规避 utf8/charset 前缀与 # 字符转义的兼容坑。
 function makeCover(seed, cat) {
-  const [c1, c2] = (TONE[cat] && TONE[cat].grad.match(/#[a-f0-9]+/gi)) || ['#888', '#aaa'];
+  const [h1, h2] = (TONE[cat] && TONE[cat].grad.match(/#[a-f0-9]+/gi)) || ['#888888', '#aaaaaa'];
+  const c1 = hexToRgb(h1), c2 = hexToRgb(h2);
   let s = seed.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
   const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
   const shapes = [];
   for (let i = 0; i < 6; i++) {
     const x = Math.floor(rnd() * 400), y = Math.floor(rnd() * 250), r = Math.floor(rnd() * 80) + 30;
-    shapes.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" opacity="${(rnd() * 0.4 + 0.1).toFixed(2)}"/>`);
+    shapes.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="rgb(255,255,255)" opacity="${(rnd() * 0.4 + 0.1).toFixed(2)}"/>`);
   }
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="400" height="250" fill="url(#g)"/>${shapes.join('')}<text x="20" y="225" font-family="Arial,sans-serif" font-size="22" font-weight="800" fill="#fff" opacity="0.85">SutaShopX</text></svg>`;
-  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="400" height="250" fill="url(#g)"/>${shapes.join('')}<text x="20" y="225" font-family="Arial,sans-serif" font-size="22" font-weight="800" fill="rgb(255,255,255)" opacity="0.85">SutaShopX</text></svg>`;
+  // base64 编码：btoa 需要 latin1，SVG 全是 ASCII 字符，直接用即可
+  try {
+    return 'data:image/svg+xml;base64,' + btoa(svg);
+  } catch (e) {
+    // 极端兜底：仍用 charset=utf-8（此时 SVG 已无 #，各浏览器都能解析）
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
 }
 
 function toast(msg) {
@@ -67,7 +87,7 @@ function renderTabs() {
   $('#headerTabs').innerHTML = tabs.map(s =>
     `<button class="tab-btn ${s === currentCat ? 'active' : ''}" data-cat="${s}">${names[s]}</button>`).join('');
   $('#drawerTabs').innerHTML = tabs.map(s =>
-    `<a class="drawer-tab ${s === currentCat ? 'active' : ''}" data-cat="${s}">${names[s]} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></a>`).join('');
+    `<a class="drawer-tab ${s === currentCat ? 'active' : ''}" data-cat="${s}">${names[s]}</a>`).join('');
 }
 
 // ---------------- 公告 ----------------
@@ -169,8 +189,16 @@ async function loadProducts() {
           <div style="margin-top:4px;"><button class="buy-btn" data-id="${p.id}" ${soldOut ? 'disabled' : ''}>${soldOut ? '已售罄' : '立即购买'}</button></div>
         </div></article>`;
     }).join('');
-    $$('#feedGrid .feed-card').forEach(c => c.onclick = () => openDetail(+c.dataset.id));
-    $$('#feedGrid .buy-btn').forEach(b => b.onclick = (e) => { e.stopPropagation(); openDetail(+b.dataset.id); });
+    // 手机端（≤820px）直接跳转到独立购买页，避免弹窗在部分内核上不弹出
+    $$('#feedGrid .feed-card').forEach(c => c.onclick = () => {
+      if (window.matchMedia('(max-width: 820px)').matches) { location.href = 'buy.html?id=' + c.dataset.id; return; }
+      openDetail(+c.dataset.id);
+    });
+    $$('#feedGrid .buy-btn').forEach(b => b.onclick = (e) => {
+      e.stopPropagation();
+      if (window.matchMedia('(max-width: 820px)').matches) { location.href = 'buy.html?id=' + b.dataset.id; return; }
+      openDetail(+b.dataset.id);
+    });
   }
   renderPagination(data);
 }
@@ -198,7 +226,7 @@ async function openDetail(id) {
   $('#modalTitle').textContent = product.name;
   const stockTxt = product.stock_mode === 'UNLIMITED' ? '库存充足' : `库存 ${product.availableStock ?? product.stock}`;
   $('#modalBody').innerHTML = `
-    <div class="detail-cover" style="background-image:url('${(product.cover_image || makeCover('p' + product.id, p.category_slug)).replace(/\'/g, '')}')"></div>
+    <div class="detail-cover" style="background-image:url('${(product.cover_image || makeCover('p' + product.id, product.category_slug)).replace(/\'/g, '')}')"></div>
     <div class="detail-meta">
       <span class="tag-chip tag-chip--blue">${product.category_name || '商品'}</span>
       <span class="tag-chip tag-chip--mint">${product.delivery_type === 'CARD_AUTO' ? '自动发卡' : product.delivery_type === 'FIXED' ? '固定内容' : '人工发货'}</span>

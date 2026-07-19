@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fbfaf7">
+<link rel="icon" type="image/png" href="/logo.png">
+<title>购买 · SutaShopX 商城</title>
+<link rel="stylesheet" href="/css/style.css?v=2">
+<style>
+  /* 手机购买页：复用设计系统，去掉桌面壳，做成沉浸单页 */
+  body { background: var(--color-bg); }
+  .buy-topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--color-surface-strong);backdrop-filter:blur(20px);border-bottom:1px solid var(--color-line);}
+  .buy-back{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--color-surface-soft);color:var(--color-ink-mid);border:1px solid var(--color-line);}
+  .buy-back:active{transform:scale(.94);}
+  .buy-topbar h1{font-size:16px;font-weight:700;}
+  .buy-wrap{max-width:560px;margin:0 auto;padding:18px 16px 60px;}
+  .buy-empty{text-align:center;color:var(--color-ink-soft);padding:60px 20px;font-size:14px;}
+  .tag-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;}
+  .tag-chip--blue{background:#e7f0ff;color:#2b6fd6;}
+  .tag-chip--mint{background:#e3f7ee;color:#1f9d6b;}
+  .tag-chip--orange{background:#fff0e0;color:#e07b1a;}
+  .stock-hint{font-size:12px;color:var(--color-ink-soft);}
+  .btn{display:inline-flex;align-items:center;justify-content:center;border:none;cursor:pointer;font-family:inherit;font-weight:700;border-radius:12px;transition:all .2s var(--ease-out);}
+  .btn-primary{background:linear-gradient(135deg,var(--color-accent-strong),var(--color-accent-cool));color:#fff;padding:12px 26px;font-size:15px;box-shadow:var(--color-float-shadow);}
+  .btn-primary:active{transform:scale(.97);}
+  .btn-primary:disabled{opacity:.6;cursor:default;}
+  .gw-select{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--color-ink-soft);margin-bottom:14px;}
+  .gw-select select{width:100%;padding:11px 12px;border-radius:10px;background:var(--color-paper);border:1px solid var(--color-line);outline:none;color:var(--color-ink-strong);font-size:14px;font-family:inherit;}
+  .gw-select select:focus{border-color:var(--color-accent-strong);}
+  .buy-foot{position:sticky;bottom:0;left:0;right:0;background:var(--color-surface-strong);backdrop-filter:blur(20px);border-top:1px solid var(--color-line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:14px;}
+  .buy-foot .total{flex:1;font-size:13px;color:var(--color-ink-mid);display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%);border:1.5px solid #fed7aa;border-radius:12px;padding:0 14px;height:46px;}
+  .buy-foot .total b{font-size:24px;font-weight:800;color:var(--color-accent-warm);letter-spacing:-.5px;}
+  .buy-foot .btn-primary{flex:0 0 auto;height:46px;}
+</style>
+</head>
+<body>
+
+<div class="buy-topbar">
+  <a class="buy-back" id="buyBack" href="buy.html" aria-label="返回">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="20" height="20"><path d="m15 18-6-6 6-6"/></svg>
+  </a>
+  <h1>商品购买</h1>
+</div>
+
+<div class="buy-wrap" id="buyWrap">
+  <div class="buy-empty" id="buyLoading">加载中…</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============== 复用前台逻辑（与 store.js 同源） ==============
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+const TONE = {
+  ai:        { grad: 'linear-gradient(135deg,#6a8dff,#8a6aff)' },
+  tools:     { grad: 'linear-gradient(135deg,#5fd1c4,#4aa3ff)' },
+  business:  { grad: 'linear-gradient(135deg,#9a7fff,#6a8dff)' },
+  materials: { grad: 'linear-gradient(135deg,#e8b94d,#ec8a5a)' },
+};
+function money(price) {
+  const cur = (window.__SITE && window.__SITE.currency) || 'usd';
+  const sym = cur === 'cny' ? '¥' : cur === 'usd' ? '$' : '';
+  return sym + (price / 100).toFixed(2);
+}
+function hexToRgb(hex) {
+  const clean = hex.replace('#', '');
+  let r, g, b;
+  if (clean.length === 3) { r = parseInt(clean[0] + clean[0], 16); g = parseInt(clean[1] + clean[1], 16); b = parseInt(clean[2] + clean[2], 16); }
+  else { r = parseInt(clean.slice(0, 2), 16); g = parseInt(clean.slice(2, 4), 16); b = parseInt(clean.slice(4, 6), 16); }
+  if ([r, g, b].some(v => isNaN(v))) return 'rgb(136,136,136)';
+  return `rgb(${r},${g},${b})`;
+}
+// 用 base64 编码整个 data URI —— 所有浏览器（含旧版 Edge、老安卓 WebView、国产内核）
+// 都 100% 支持，彻底规避 utf8/charset 前缀与 # 字符转义的兼容坑。
+function makeCover(seed, cat) {
+  const [h1, h2] = (TONE[cat] && TONE[cat].grad.match(/#[a-f0-9]+/gi)) || ['#888888', '#aaaaaa'];
+  const c1 = hexToRgb(h1), c2 = hexToRgb(h2);
+  let s = seed.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+  const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  const shapes = [];
+  for (let i = 0; i < 6; i++) {
+    const x = Math.floor(rnd() * 400), y = Math.floor(rnd() * 250), r = Math.floor(rnd() * 80) + 30;
+    shapes.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="rgb(255,255,255)" opacity="${(rnd() * 0.4 + 0.1).toFixed(2)}"/>`);
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="400" height="250" fill="url(#g)"/>${shapes.join('')}<text x="20" y="225" font-family="Arial,sans-serif" font-size="22" font-weight="800" fill="rgb(255,255,255)" opacity="0.85">SutaShopX</text></svg>`;
+  try {
+    return 'data:image/svg+xml;base64,' + btoa(svg);
+  } catch (e) {
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+}
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._timer); t._timer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+let GATEWAYS = [];
+let product = null;
+let qty = 1;
+
+// 返回键：老内核对 href="javascript:..." 支持差，统一用事件绑定
+(function bindBack() {
+  const back = document.getElementById('buyBack');
+  if (!back) return;
+  back.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (history.length > 1) history.back();
+    else location.href = '/';
+  });
+})();
+
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/config');
+    const data = await r.json();
+    window.__SITE = data.site || null;
+    GATEWAYS = data.gateways || [];
+  } catch (e) { /* 网关为空也能下单（走默认支付） */ }
+}
+
+async function loadProduct() {
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { $('#buyWrap').innerHTML = '<div class="buy-empty">缺少商品参数</div>'; return; }
+  try {
+    const r = await fetch('/api/products/' + id);
+    if (!r.ok) { $('#buyWrap').innerHTML = '<div class="buy-empty">商品不存在或已下架</div>'; return; }
+    const { product: p } = await r.json();
+    render(p);
+  } catch (e) {
+    $('#buyWrap').innerHTML = '<div class="buy-empty">加载失败，请返回重试</div>';
+  }
+}
+
+function render(p) {
+  product = p;
+  const min = p.min_buy || 1, max = p.max_buy || 1;
+  const stockTxt = p.stock_mode === 'UNLIMITED' ? '库存充足' : `库存 ${p.availableStock ?? p.stock}`;
+  qty = min;
+
+  const gwHtml = GATEWAYS.length
+    ? `<div class="gw-select"><label>支付方式</label><select id="gwSelect">${GATEWAYS.map(g => `<option value="${g.id}">${g.display_name}</option>`).join('')}</select></div>`
+    : '';
+
+  $('#buyWrap').innerHTML = `
+    <div class="detail-cover" style="background-image:url('${(p.cover_image || makeCover('p' + p.id, p.category_slug)).replace(/\'/g, '')}')"></div>
+    <div class="detail-meta">
+      <span class="tag-chip tag-chip--blue">${p.category_name || '商品'}</span>
+      <span class="tag-chip tag-chip--mint">${p.delivery_type === 'CARD_AUTO' ? '自动发卡' : p.delivery_type === 'FIXED' ? '固定内容' : '人工发货'}</span>
+      <span class="tag-chip tag-chip--orange">${stockTxt}</span>
+    </div>
+    <p class="detail-desc">${p.description || p.subtitle || '暂无描述'}</p>
+    <div class="detail-price"><span class="price">${money(p.price)}</span><span class="stock-hint">/ 件</span></div>
+    <div class="contact-row" style="margin:10px 0 6px;"><input id="contactInput" type="text" placeholder="联系方式选填（如邮箱/微信，便于售后）" style="width:100%;padding:11px 14px;border-radius:10px;background:var(--color-paper);border:1px solid var(--color-line);outline:none;"></div>
+    <div class="qty-row" style="margin-bottom:6px;"><label style="width:64px;flex-shrink:0;font-size:13px;color:var(--color-ink-soft);">购买数量</label>
+      <div class="qty-ctrl">
+        <button id="qtyMinus">−</button>
+        <input id="qtyInput" type="number" min="${min}" max="${max}" value="${min}">
+        <button id="qtyPlus">+</button>
+      </div>
+      <span class="stock-hint">限购 ${min}~${max} 件</span>
+    </div>
+    ${gwHtml}
+    ${p.purchase_note ? `<p style="font-size:12px;color:var(--color-ink-soft);margin:10px 0 0;">${p.purchase_note}</p>` : ''}
+    <div class="buy-foot">
+      <span class="total">合计：<b id="totalPrice">${money(p.price * min)}</b></span>
+      <button class="btn btn-primary" id="buyNow">去支付</button>
+    </div>`;
+
+  const sync = () => {
+    qty = Math.max(min, Math.min(max, parseInt($('#qtyInput').value) || min));
+    $('#qtyInput').value = qty;
+    $('#totalPrice').textContent = money(p.price * qty);
+  };
+  $('#qtyMinus').onclick = () => { $('#qtyInput').value = qty - 1; sync(); };
+  $('#qtyPlus').onclick  = () => { $('#qtyInput').value = qty + 1; sync(); };
+  $('#qtyInput').oninput = sync;
+  $('#buyNow').onclick = () => buy(p, qty);
+}
+
+async function buy(p, qty) {
+  const btn = $('#buyNow');
+  btn.disabled = true; btn.textContent = '下单中…';
+  try {
+    const r = await fetch('/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        productId: p.id,
+        quantity: qty,
+        contact: ($('#contactInput') ? $('#contactInput').value.trim() : ''),
+        gateway: ($('#gwSelect') ? $('#gwSelect').value : 0),
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) { toast(data.error || '下单失败'); btn.disabled = false; btn.textContent = '去支付'; return; }
+    toast('正在跳转到支付…');
+    setTimeout(() => { window.location.href = data.payUrl; }, 400);
+  } catch (e) {
+    toast('网络错误');
+    btn.disabled = false; btn.textContent = '去支付';
+  }
+}
+
+(async () => {
+  await loadConfig();
+  await loadProduct();
+})();
+</script>
+</body>
+</html>

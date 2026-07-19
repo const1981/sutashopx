@@ -149,13 +149,13 @@ input,select,textarea{font:inherit;color:inherit;}
 .hamburger.open span:nth-child(1){transform:translateY(5.5px) rotate(45deg);}
 .hamburger.open span:nth-child(2){opacity:0;}
 .hamburger.open span:nth-child(3){transform:translateY(-5.5px) rotate(-45deg);}
-.drawer-mask{position:fixed;inset:0;background:var(--mask-bg);opacity:0;pointer-events:none;transition:opacity .36s var(--ease-out);z-index:60;}
+.drawer-mask{position:fixed;top:0;right:0;bottom:0;left:0;background:var(--mask-bg);opacity:0;pointer-events:none;transition:opacity .36s var(--ease-out);z-index:60;}
 .drawer-mask.open{opacity:1;pointer-events:auto;}
 .drawer-panel{position:fixed;left:0;top:0;bottom:0;width:min(84vw,336px);background:var(--drawer-bg);backdrop-filter:blur(20px);border-right:1px solid var(--color-line);transform:translateX(-100%);transition:transform .36s var(--ease-out);z-index:61;display:flex;flex-direction:column;padding:18px 16px;overflow-y:auto;}
 .drawer-panel.open{transform:translateX(0);}
 .drawer-head{display:flex;align-items:center;gap:10px;padding:8px 6px 18px;border-bottom:1px solid var(--color-line);margin-bottom:14px;}
 .drawer-tabs{display:flex;flex-direction:column;gap:4px;}
-.drawer-tab{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:10px;color:var(--color-ink-mid);font-weight:500;transition:all .24s var(--ease-out);}
+.drawer-tab{display:flex;align-items:center;min-height:44px;padding:12px 14px;border-radius:10px;color:var(--color-ink-mid);font-weight:500;transition:all .24s var(--ease-out);}
 .drawer-tab:hover{background:var(--color-surface-soft);color:var(--color-ink-strong);}
 .drawer-tab.active{background:linear-gradient(135deg,var(--color-accent-strong),var(--color-accent-cool));color:#fff;}
 
@@ -277,7 +277,7 @@ main{padding:28px 0 60px;}
 .chk-all{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--color-ink-mid);cursor:pointer;user-select:none;}
 
 /* ============== Modal ============== */
-.modal-mask{position:fixed;inset:0;background:#00000066;backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;z-index:80;opacity:0;pointer-events:none;transition:opacity .3s var(--ease-out);padding:20px;}
+.modal-mask{position:fixed;top:0;right:0;bottom:0;left:0;background:#00000066;backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;z-index:80;opacity:0;pointer-events:none;transition:opacity .3s var(--ease-out);padding:20px;}
 .modal-mask.open{opacity:1;pointer-events:auto;}
 .modal-card{background:var(--color-surface-strong);backdrop-filter:blur(20px);border:1px solid var(--color-card-border);border-radius:var(--radius-lg);box-shadow:var(--color-float-shadow);max-width:560px;width:100%;max-height:90vh;overflow-y:auto;transform:scale(.92) translateY(20px);opacity:0;transition:all .4s var(--ease-out);}
 .modal-mask.open .modal-card{transform:scale(1) translateY(0);opacity:1;}
@@ -343,7 +343,7 @@ main{padding:28px 0 60px;}
 .admin-nav .spacer{margin-top:auto;}
 .admin-menu-btn{display:none;flex-direction:column;gap:4px;width:38px;height:38px;border-radius:10px;background:var(--color-surface-soft);border:1px solid var(--color-line);align-items:center;justify-content:center;flex-shrink:0;}
 .admin-menu-btn span{display:block;width:18px;height:1.5px;background:var(--color-ink-mid);border-radius:2px;}
-.admin-mask{display:none;position:fixed;inset:0;background:var(--mask-bg);opacity:0;pointer-events:none;transition:opacity .3s var(--ease-out);z-index:65;}
+.admin-mask{display:none;position:fixed;top:0;right:0;bottom:0;left:0;background:var(--mask-bg);opacity:0;pointer-events:none;transition:opacity .3s var(--ease-out);z-index:65;}
 .admin-mask.open{opacity:1;pointer-events:auto;}
 .admin-main{flex:1;padding:26px 30px;min-width:0;}
 .admin-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
@@ -381,6 +381,8 @@ table.data tr:hover td{background:var(--color-surface-soft);}
 /* ============== 响应式 ============== */
 @media (max-width: 980px){.about-brand{grid-template-columns:repeat(2,1fr);}}
 @media (max-width: 820px){
+  /* 手机版去掉幻灯片（用户要求简化） */
+  .carousel-shell{display:none;}
   .desktop-shell{display:none;}
   .mobile-shell{display:flex;height:58px;align-items:center;padding-top:max(10px,env(safe-area-inset-top));padding-bottom:10px;gap:10px;}
   .mobile-shell .brand{flex:1;min-width:0;}
