@@ -400,6 +400,12 @@ table.data tr:hover td{background:var(--color-surface-soft);}
   .banner-arrow{display:none;}
   .feed-head{flex-direction:column;align-items:flex-start;}
   .feed-grid{grid-template-columns:repeat(2,1fr);gap:14px;}
+  /* 老手机禁用 backdrop-filter，否则卡死/白屏 */
+  .site-header{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--color-surface);}
+  .drawer-panel{backdrop-filter:none;background:var(--color-paper);}
+  .modal-mask{backdrop-filter:none;background:#00000099;}
+  .modal-card{backdrop-filter:none;}
+  .modal-head{backdrop-filter:none;}
 }
 @media (max-width: 760px){
   .admin-side{position:fixed;left:0;top:0;bottom:0;z-index:70;transform:translateX(-100%);transition:transform .3s var(--ease-out);width:240px;}

@@ -10,7 +10,7 @@
 <style>
   /* 手机购买页：复用设计系统，去掉桌面壳，做成沉浸单页 */
   body { background: var(--color-bg); }
-  .buy-topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--color-surface-strong);backdrop-filter:blur(20px);border-bottom:1px solid var(--color-line);}
+  .buy-topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--color-surface-strong);border-bottom:1px solid var(--color-line);}
   .buy-back{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--color-surface-soft);color:var(--color-ink-mid);border:1px solid var(--color-line);}
   .buy-back:active{transform:scale(.94);}
   .buy-topbar h1{font-size:16px;font-weight:700;}
@@ -28,7 +28,7 @@
   .gw-select{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--color-ink-soft);margin-bottom:14px;}
   .gw-select select{width:100%;padding:11px 12px;border-radius:10px;background:var(--color-paper);border:1px solid var(--color-line);outline:none;color:var(--color-ink-strong);font-size:14px;font-family:inherit;}
   .gw-select select:focus{border-color:var(--color-accent-strong);}
-  .buy-foot{position:sticky;bottom:0;left:0;right:0;background:var(--color-surface-strong);backdrop-filter:blur(20px);border-top:1px solid var(--color-line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:14px;}
+  .buy-foot{position:sticky;bottom:0;left:0;right:0;background:var(--color-surface-strong);border-top:1px solid var(--color-line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:14px;}
   .buy-foot .total{flex:1;font-size:13px;color:var(--color-ink-mid);display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%);border:1.5px solid #fed7aa;border-radius:12px;padding:0 14px;height:46px;}
   .buy-foot .total b{font-size:24px;font-weight:800;color:var(--color-accent-warm);letter-spacing:-.5px;}
   .buy-foot .btn-primary{flex:0 0 auto;height:46px;}
