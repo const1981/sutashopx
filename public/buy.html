@@ -140,7 +140,7 @@ function render(p) {
   product = p;
   const min = p.min_buy || 1, max = p.max_buy || 1;
   const stockTxt = p.stock_mode === 'UNLIMITED' ? '库存充足' : `库存 ${p.availableStock ?? p.stock}`;
-  const soldOut = p.stock_mode !== 'UNLIMITED' && (p.availableStock ?? p.stock) <= 0;
+  const soldOut = p.stock_mode !== 'UNLIMITED' && (Number(p.availableStock ?? p.stock ?? 0)) <= 0;
   qty = min;
 
   const gwHtml = GATEWAYS.length

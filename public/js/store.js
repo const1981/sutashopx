@@ -174,7 +174,7 @@ async function loadProducts() {
         ? '<span class="stock-hint">库存充足</span>'
         : (p.availableStock <= 0 ? '<span class="stock-hint stock-low">已售罄</span>'
           : (p.availableStock <= 5 ? `<span class="stock-hint stock-low">仅剩 ${p.availableStock} 件</span>` : `<span class="stock-hint">库存 ${p.availableStock}</span>`));
-      const soldOut = p.stock_mode !== 'UNLIMITED' && p.availableStock <= 0;
+      const soldOut = p.stock_mode !== 'UNLIMITED' && (Number(p.availableStock ?? p.stock ?? 0)) <= 0;
       return `<article class="feed-card ${tone}${soldOut ? ' sold-out' : ''}" data-id="${p.id}" style="animation-delay:${i * 50}ms">
         <div class="card-thumb"><div class="card-thumb-tone"></div>
           <img loading="lazy" decoding="async" src="${p.cover_image || makeCover('p' + p.id, p.category_slug)}" alt="${p.name}">
@@ -190,11 +190,9 @@ async function loadProducts() {
           <div style="margin-top:4px;"><button class="buy-btn" data-id="${p.id}" ${soldOut ? 'disabled' : ''}>${soldOut ? '已售罄' : '立即购买'}</button></div>
         </div></article>`;
     }).join('');
-    // 手机端（≤820px）直接跳转到独立购买页，避免弹窗在部分内核上不弹出
+    // 卡片/图片本身不可点击购买：仅「立即购买」按钮可发起购买流程（售罄点击仅提示，不弹窗不跳转）
     $$('#feedGrid .feed-card').forEach(c => c.onclick = () => {
-      if (c.classList.contains('sold-out')) { toast('该商品已售罄，暂时无法购买'); return; }
-      if (window.matchMedia('(max-width: 820px)').matches) { location.href = 'buy.html?id=' + c.dataset.id; return; }
-      openDetail(+c.dataset.id);
+      if (c.classList.contains('sold-out')) toast('该商品已售罄，暂时无法购买');
     });
     $$('#feedGrid .buy-btn').forEach(b => b.onclick = (e) => {
       e.stopPropagation();
@@ -228,7 +226,7 @@ async function openDetail(id) {
   const min = product.min_buy || 1, max = product.max_buy || 1;
   $('#modalTitle').textContent = product.name;
   const stockTxt = product.stock_mode === 'UNLIMITED' ? '库存充足' : `库存 ${product.availableStock ?? product.stock}`;
-  const soldOut = product.stock_mode !== 'UNLIMITED' && (product.availableStock ?? product.stock) <= 0;
+  const soldOut = product.stock_mode !== 'UNLIMITED' && (Number(product.availableStock ?? product.stock ?? 0)) <= 0;
   $('#modalBody').innerHTML = `
     <div class="detail-cover"><img src="${product.cover_image || makeCover('p' + product.id, product.category_slug)}" alt="${product.name}"></div>
     <div class="detail-meta">

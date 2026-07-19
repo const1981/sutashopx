@@ -910,8 +910,8 @@ async function createPayment(env, order, product, gatewayId) {
       return { ok: true, provider: 'epay', payUrl };
     }
     if (g.type === 'alipay' || g.type === 'wechat') {
-      // 暂未接官方通道，回退演示（保留原行为）
-      return { ok: true, provider: 'demo', payUrl: `/success.html?order=${order.order_no}&demo=1&token=${order.query_token}` };
+      // 暂未接官方通道，直接报错，不再假支付
+      return { ok: false, provider: g.type, error: '该支付通道暂未开通，请联系管理员更换为 USDT / 易支付 / Stripe' };
     }
   }
 
@@ -942,8 +942,8 @@ async function createPayment(env, order, product, gatewayId) {
     } catch (e) { return { ok: false, provider: 'stripe', error: e.message }; }
   }
 
-  // 3) 演示模式
-  return { ok: true, provider: 'demo', payUrl: `/success.html?order=${order.order_no}&demo=1&token=${order.query_token}` };
+  // 3) 无可用真实支付通道：报错，不假支付
+  return { ok: false, provider: 'none', error: '未配置可用支付方式，请联系管理员在后台启用 USDT / 易支付 / Stripe' };
 }
 
 function safeJson(str, def) {
@@ -1149,10 +1149,22 @@ async function handleApi(request, env, ctx) {
        ${whereSql} ORDER BY p.sort ASC, p.id DESC LIMIT ? OFFSET ?`,
       ...params, pageSize, (page - 1) * pageSize
     );
-    const list = items.map((it) => ({
-      ...it,
-      availableStock: it.stock_mode === 'UNLIMITED' ? null : it.stock,
-    }));
+    // 批量查发卡类商品的未售卡密数（避免 N+1 查询）
+    const cardIds = items.filter((it) => it.stock_mode === 'FINITE' && it.delivery_type === 'CARD_AUTO').map((it) => it.id);
+    let cardStock = {};
+    if (cardIds.length) {
+      const ph = cardIds.map(() => '?').join(',');
+      const rows = await all(env, `SELECT product_id, COUNT(*) AS n FROM cards WHERE status=0 AND product_id IN (${ph}) GROUP BY product_id`, ...cardIds);
+      for (const r of rows) cardStock[r.product_id] = r.n;
+    }
+    const list = items.map((it) => {
+      let availableStock = null;
+      if (it.stock_mode === 'FINITE') {
+        // 发卡类：剩余库存 = 未售出的卡密数；固定/人工类：用配置库存
+        availableStock = it.delivery_type === 'CARD_AUTO' ? (cardStock[it.id] ?? 0) : it.stock;
+      }
+      return { ...it, availableStock };
+    });
     return json({ items: list, page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) });
   }
 
@@ -1237,21 +1249,7 @@ async function handleApi(request, env, ctx) {
     return json({ orderNo, mode: pay.provider, payUrl: pay.payUrl, token });
   }
 
-  // ---- 公开：演示支付完成 ----
-  if (path === '/api/pay/demo' && method === 'POST') {
-    let body;
-    try { body = await request.json(); } catch { return jsonErr('请求体格式错误'); }
-    const order = await first(env, 'SELECT * FROM orders WHERE order_no=?', body.orderNo);
-    if (!order) return jsonErr('订单不存在', 404);
-    const prodD = await first(env, 'SELECT delivery_type FROM products WHERE id=?', order.product_id);
-    const dtype = prodD ? prodD.delivery_type : '';
-    if (order.status !== 'PENDING') {
-      const keys = order.delivered_keys ? JSON.parse(order.delivered_keys) : [];
-      return json({ already: true, status: order.status, keys, note: order.delivery_note, delivery_type: dtype });
-    }
-    const res = await markPaid(env, order, 'demo', 'demo-' + order.order_no);
-    return json({ status: res.status, keys: res.keys, note: res.note, delivery_type: dtype });
-  }
+  // 演示支付端点已移除：不再支持假支付，请使用 USDT / 易支付 / Stripe 真实通道
 
   // ---- 公开：BEpusdt 回调 ----
   if (path === '/api/payments/bepusdt/notify' && method === 'POST') {

@@ -21,6 +21,8 @@ function signBepusdt(payload, secret) {
 const db = new DatabaseSync(':memory:');
 db.exec(readFileSync(new URL('../schema.sql', import.meta.url), 'utf8'));
 db.exec(readFileSync(new URL('../seed.sql', import.meta.url), 'utf8'));
+// 测试用：启用种子 USDT 网关（模拟后台已配置），否则 checkout 会因 enabled=0 失败
+db.exec("UPDATE payment_gateways SET enabled=1 WHERE id=1");
 
 // ---- 伪 D1 适配器（兼容 worker 用法）----
 const fakeD1 = {
@@ -60,7 +62,6 @@ const env = {
   R2: fakeR2,
   AUTH_SECRET: 'integration-secret',
   AI_API_KEY: 'test-machine-key-123',
-  PAYMENT_MODE: 'demo',
   STRIPE_CURRENCY: 'usd',
 };
 
@@ -129,15 +130,15 @@ ok('带 token 查统计 200', r.status === 200);
 ok('统计含商品数=3', d.data.products === 3, d.data.products);
 
 // 6. 下单（演示商品 1，库存 8 张卡）
-r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 2, contact: 'buyer@test.com' }), env, ctx);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 2, gateway: 1, contact: 'buyer@test.com' }), env, ctx);
 d = await jr(r);
 ok('下单成功', r.status === 200 && d.data.orderNo);
-ok('演示模式返回成功页 payUrl', d.data.payUrl.includes('/success.html?order='), d.data.payUrl);
+ok('USDT 下单返回 payUrl', !!d.data.payUrl && d.data.payUrl.length > 0, d.data.payUrl);
 const orderNo = d.data.orderNo;
 const orderToken = d.data.token;
 
-// 7. 演示支付完成 -> 自动发货
-r = await worker.fetch(req('POST', '/api/pay/demo', { orderNo }), env, ctx);
+// 7. 支付完成（USDT 手动确认）-> 自动发货
+r = await worker.fetch(req('POST', '/api/pay/usdt/confirm', { orderNo, token: orderToken }), env, ctx);
 d = await jr(r);
 ok('演示支付后状态为已发货', d.data.status === 'DELIVERED', d.data.status);
 ok('演示支付发出 2 张卡密', d.data.keys.length === 2, d.data.keys);
@@ -169,10 +170,10 @@ ok('新建商品成功', r.status === 200 && d.data.id);
 const newId = d.data.id;
 
 // 12. 购买固定内容商品 -> 固定内容发货
-r = await worker.fetch(req('POST', '/api/checkout', { productId: newId, quantity: 1, contact: 'buyer@test.com' }), env, ctx);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: newId, quantity: 1, gateway: 1, contact: 'buyer@test.com' }), env, ctx);
 d = await jr(r);
 const o2 = d.data.orderNo, t2 = d.data.token;
-r = await worker.fetch(req('POST', '/api/pay/demo', { orderNo: o2 }), env, ctx);
+r = await worker.fetch(req('POST', '/api/pay/usdt/confirm', { orderNo: o2, token: t2 }), env, ctx);
 d = await jr(r);
 ok('固定内容商品发货内容为 HELLO', d.data.keys.includes('HELLO'), d.data.keys);
 ok('固定内容商品状态为已发货(DELIVERED)', d.data.status === 'DELIVERED', d.data.status);
@@ -242,7 +243,7 @@ r = await worker.fetch(req('PUT', '/api/admin/gateways/1', {
 ok('配置真实 BEpusdt 网关成功', r.status === 200);
 r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, gateway: 1, contact: 'buyer@test.com' }), env, ctx);
 d = await jr(r);
-ok('BEpusdt 真实网关下单成功', d.data.orderNo && d.data.payUrl === 'https://bepusdt.example.com/pay/mock-123', d.data);
+ok('USDT 真实网关下单成功(走收银台)', d.data.orderNo && d.data.payUrl === 'https://bepusdt.example.com/pay/mock-123', d.data.payUrl);
 const realOrder = d.data.orderNo, realToken = d.data.token;
 
 // 15.4.1 模拟 BEpusdt 带签名回调
@@ -353,10 +354,10 @@ ok('种子商品 1 未被整类清空误删', r.status === 200 && d.data.product
 r = await worker.fetch(req('PUT', '/api/admin/settings', { feishu_webhook: 'https://open.feishu.cn/open-apis/bot/v2/hook/test', feishu_secret: '' }, { Authorization: 'Bearer ' + token }), env, ctx);
 ok('保存飞书 webhook 配置成功', r.status === 200);
 feishuCalls = 0; lastFeishuBody = null;
-r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, contact: 'buyer@test.com' }), env, ctx);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, gateway: 1, contact: 'buyer@test.com' }), env, ctx);
 d = await jr(r);
-const oF1 = d.data.orderNo;
-r = await worker.fetch(req('POST', '/api/pay/demo', { orderNo: oF1 }), env, ctx);
+const oF1 = d.data.orderNo, oF1token = d.data.token;
+r = await worker.fetch(req('POST', '/api/pay/usdt/confirm', { orderNo: oF1, token: oF1token }), env, ctx);
 ok('支付成功触发飞书通知', feishuCalls >= 1, feishuCalls);
 ok('飞书消息为 interactive 卡片', lastFeishuBody && lastFeishuBody.msg_type === 'interactive', lastFeishuBody);
 ok('飞书卡片含订单号', lastFeishuBody && lastFeishuBody.card && JSON.stringify(lastFeishuBody.card).includes(oF1), lastFeishuBody);
@@ -368,18 +369,18 @@ ok('飞书卡片 fields.text 为对象 {tag:lark_md,content}', f0 && typeof f0 =
 feishuCalls = 0; lastFeishuBody = null;
 r = await worker.fetch(req('PUT', '/api/admin/settings', { feishu_webhook: 'https://open.feishu.cn/open-apis/bot/v2/hook/test', feishu_secret: 'mysecret' }, { Authorization: 'Bearer ' + token }), env, ctx);
 ok('保存飞书 secret 配置成功', r.status === 200);
-r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, contact: 'buyer@test.com' }), env, ctx);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, gateway: 1, contact: 'buyer@test.com' }), env, ctx);
 d = await jr(r);
-await worker.fetch(req('POST', '/api/pay/demo', { orderNo: d.data.orderNo }), env, ctx);
+await worker.fetch(req('POST', '/api/pay/usdt/confirm', { orderNo: d.data.orderNo, token: d.data.token }), env, ctx);
 ok('带 secret 时飞书消息含 sign + timestamp', lastFeishuBody && lastFeishuBody.sign && lastFeishuBody.timestamp, lastFeishuBody);
 
 // 21.3 webhook 清空则不发
 feishuCalls = 0;
 r = await worker.fetch(req('PUT', '/api/admin/settings', { feishu_webhook: '', feishu_secret: '' }, { Authorization: 'Bearer ' + token }), env, ctx);
 ok('清空飞书 webhook 配置成功', r.status === 200);
-r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, contact: 'buyer@test.com' }), env, ctx);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, gateway: 1, contact: 'buyer@test.com' }), env, ctx);
 d = await jr(r);
-await worker.fetch(req('POST', '/api/pay/demo', { orderNo: d.data.orderNo }), env, ctx);
+await worker.fetch(req('POST', '/api/pay/usdt/confirm', { orderNo: d.data.orderNo, token: d.data.token }), env, ctx);
 ok('webhook 为空时不发飞书', feishuCalls === 0, feishuCalls);
 
 // 22. 后台「按 ID 取详情」回归（之前 GET /api/admin/products/{id} 与 /categories/{id} 缺失，导致编辑表单空白）
@@ -450,7 +451,7 @@ d = await jr(r);
 ok('折扣码列表含 TEST20', d.data.items.some(c => c.code === 'TEST20'), d.data.items.length);
 
 // 25.2 下单使用折扣码 -> 金额打折 + 记录 coupon_code + used_count 自增
-r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, contact: 'buyer@test.com', coupon: 'test20' }), env, ctx);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, gateway: 1, contact: 'buyer@test.com', coupon: 'test20' }), env, ctx);
 d = await jr(r);
 ok('带折扣码下单成功', r.status === 200 && d.data.orderNo, d.data);
 const cpnOrder = d.data.orderNo, cpnToken = d.data.token;
@@ -458,7 +459,7 @@ r = await worker.fetch(req('GET', `/api/orders/${cpnOrder}?token=${cpnToken}`), 
 d = await jr(r);
 ok('订单记录了 coupon_code(大写归一)', d.data.order.coupon_code === 'TEST20', d.data.order.coupon_code);
 ok('折扣后金额 < 原价', d.data.order.amount < d.data.order.unit_price * d.data.order.quantity, `${d.data.order.amount} < ${d.data.order.unit_price * d.data.order.quantity}`);
-r = await worker.fetch(req('POST', '/api/pay/demo', { orderNo: cpnOrder }), env, ctx);
+r = await worker.fetch(req('POST', '/api/pay/usdt/confirm', { orderNo: cpnOrder, token: cpnToken }), env, ctx);
 r = await worker.fetch(req('GET', '/api/admin/coupons/' + cpnId, null, { Authorization: 'Bearer ' + token }), env, ctx);
 d = await jr(r);
 ok('支付后折扣码 used_count 自增为 1', d.data.used_count === 1, d.data.used_count);
@@ -499,6 +500,23 @@ ok('个人资料更新成功', r.status === 200, d.data);
 r = await worker.fetch(req('GET', '/api/admin/me', null, { Authorization: 'Bearer ' + token }), env, ctx);
 d = await jr(r);
 ok('me 回读 nickname=管理员甲', d.data.admin.nickname === '管理员甲', d.data.admin);
+
+
+// 26. 回归：发卡类商品「售罄」必须被识别
+//     列表/单品 availableStock 必须按「未售卡密数」算，绝不能用配置库存（否则卖光了还显示有库存、可点购买）
+r = await worker.fetch(req('POST', '/api/admin/products', { name: '售罄回归测试', price: 1, delivery_type: 'CARD_AUTO', stock_mode: 'FINITE', stock: 5 }, { Authorization: 'Bearer ' + token }), env, ctx);
+d = await jr(r);
+const soId = d.data.id;
+// 列表（用名称搜索避免分页干扰）
+r = await worker.fetch(req('GET', '/api/products?cat=all&q=' + encodeURIComponent('售罄回归测试')), env, ctx);
+d = await jr(r);
+const soList = (d.data.items || []).find(x => x.id === soId);
+ok('发卡商品无卡密→列表 availableStock=0(识别为售罄)', soList && soList.availableStock === 0, soList);
+ok('发卡商品列表库存取未售卡密数、而非配置库存5', soList && soList.availableStock !== 5, soList);
+// 单品接口同样断言
+r = await worker.fetch(req('GET', '/api/products/' + soId), env, ctx);
+d = await jr(r);
+ok('发卡商品无卡密→单品 availableStock=0', d.data.product && d.data.product.availableStock === 0, d.data.product);
 
 console.log(`\n集成测试结果：通过 ${pass} / 失败 ${fail}`);
 process.exit(fail ? 1 : 0);
