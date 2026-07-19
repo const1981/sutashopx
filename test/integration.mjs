@@ -129,7 +129,7 @@ ok('带 token 查统计 200', r.status === 200);
 ok('统计含商品数=3', d.data.products === 3, d.data.products);
 
 // 6. 下单（演示商品 1，库存 8 张卡）
-r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 2 }), env, ctx);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 2, contact: 'buyer@test.com' }), env, ctx);
 d = await jr(r);
 ok('下单成功', r.status === 200 && d.data.orderNo);
 ok('演示模式返回成功页 payUrl', d.data.payUrl.includes('/success.html?order='), d.data.payUrl);
@@ -169,7 +169,7 @@ ok('新建商品成功', r.status === 200 && d.data.id);
 const newId = d.data.id;
 
 // 12. 购买固定内容商品 -> 固定内容发货
-r = await worker.fetch(req('POST', '/api/checkout', { productId: newId, quantity: 1 }), env, ctx);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: newId, quantity: 1, contact: 'buyer@test.com' }), env, ctx);
 d = await jr(r);
 const o2 = d.data.orderNo, t2 = d.data.token;
 r = await worker.fetch(req('POST', '/api/pay/demo', { orderNo: o2 }), env, ctx);
@@ -216,7 +216,7 @@ ok('前台 config 暴露已启用的 USDT 网关', d.data.gateways.length === 1 
 ok('前台网关不含密钥', d.data.gateways[0].app_secret === undefined);
 
 // 15.2 用 USDT 网关下单
-r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, gateway: 1 }), env, ctx);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, gateway: 1, contact: 'buyer@test.com' }), env, ctx);
 d = await jr(r);
 ok('USDT 下单成功', r.status === 200 && d.data.orderNo);
 ok('USDT 订单 payUrl 指向 crypto 成功页', d.data.payUrl.includes('/success.html?order=') && d.data.payUrl.includes('crypto=1'), d.data.payUrl);
@@ -240,7 +240,7 @@ r = await worker.fetch(req('PUT', '/api/admin/gateways/1', {
   extra: { chain: 'TRC20', currency: 'USDT', wallet: 'TWalletAddr', rate: 1 }, sort: 1, enabled: 1,
 }, { Authorization: 'Bearer ' + token }), env, ctx);
 ok('配置真实 BEpusdt 网关成功', r.status === 200);
-r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, gateway: 1 }), env, ctx);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, gateway: 1, contact: 'buyer@test.com' }), env, ctx);
 d = await jr(r);
 ok('BEpusdt 真实网关下单成功', d.data.orderNo && d.data.payUrl === 'https://bepusdt.example.com/pay/mock-123', d.data);
 const realOrder = d.data.orderNo, realToken = d.data.token;
@@ -259,7 +259,7 @@ r = await worker.fetch(req('PUT', '/api/admin/gateways/1', {
   type: 'usdt', display_name: 'USDT-手动', gateway_url: '', app_id: '', app_secret: '',
   extra: { chain: 'TRC20', currency: 'USDT', wallet: 'TManualAddr', rate: 1 }, sort: 1, enabled: 1,
 }, { Authorization: 'Bearer ' + token }), env, ctx);
-r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, gateway: 1 }), env, ctx);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, gateway: 1, contact: 'buyer@test.com' }), env, ctx);
 d = await jr(r);
 const manualOrder = d.data.orderNo, manualToken = d.data.token;
 r = await worker.fetch(req('POST', '/api/pay/usdt/confirm', { orderNo: manualOrder, token: manualToken }), env, ctx);
@@ -353,7 +353,7 @@ ok('种子商品 1 未被整类清空误删', r.status === 200 && d.data.product
 r = await worker.fetch(req('PUT', '/api/admin/settings', { feishu_webhook: 'https://open.feishu.cn/open-apis/bot/v2/hook/test', feishu_secret: '' }, { Authorization: 'Bearer ' + token }), env, ctx);
 ok('保存飞书 webhook 配置成功', r.status === 200);
 feishuCalls = 0; lastFeishuBody = null;
-r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1 }), env, ctx);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, contact: 'buyer@test.com' }), env, ctx);
 d = await jr(r);
 const oF1 = d.data.orderNo;
 r = await worker.fetch(req('POST', '/api/pay/demo', { orderNo: oF1 }), env, ctx);
@@ -368,7 +368,7 @@ ok('飞书卡片 fields.text 为对象 {tag:lark_md,content}', f0 && typeof f0 =
 feishuCalls = 0; lastFeishuBody = null;
 r = await worker.fetch(req('PUT', '/api/admin/settings', { feishu_webhook: 'https://open.feishu.cn/open-apis/bot/v2/hook/test', feishu_secret: 'mysecret' }, { Authorization: 'Bearer ' + token }), env, ctx);
 ok('保存飞书 secret 配置成功', r.status === 200);
-r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1 }), env, ctx);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, contact: 'buyer@test.com' }), env, ctx);
 d = await jr(r);
 await worker.fetch(req('POST', '/api/pay/demo', { orderNo: d.data.orderNo }), env, ctx);
 ok('带 secret 时飞书消息含 sign + timestamp', lastFeishuBody && lastFeishuBody.sign && lastFeishuBody.timestamp, lastFeishuBody);
@@ -377,7 +377,7 @@ ok('带 secret 时飞书消息含 sign + timestamp', lastFeishuBody && lastFeish
 feishuCalls = 0;
 r = await worker.fetch(req('PUT', '/api/admin/settings', { feishu_webhook: '', feishu_secret: '' }, { Authorization: 'Bearer ' + token }), env, ctx);
 ok('清空飞书 webhook 配置成功', r.status === 200);
-r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1 }), env, ctx);
+r = await worker.fetch(req('POST', '/api/checkout', { productId: 1, quantity: 1, contact: 'buyer@test.com' }), env, ctx);
 d = await jr(r);
 await worker.fetch(req('POST', '/api/pay/demo', { orderNo: d.data.orderNo }), env, ctx);
 ok('webhook 为空时不发飞书', feishuCalls === 0, feishuCalls);

@@ -235,7 +235,7 @@ async function openDetail(id) {
     </div>
     <p class="detail-desc">${product.description || product.subtitle || '暂无描述'}</p>
     <div class="detail-price"><span class="price">${money(product.price)}</span><span class="stock-hint">/ 件</span></div>
-    <div class="contact-row"><input id="contactInput" type="text" placeholder="联系方式的选填（如邮箱/微信，便于售后）"></div>
+    <div class="contact-row"><input id="contactInput" type="text" placeholder="联系方式 * 必填（邮箱/微信，用于发货与售后）"></div>
     <div class="qty-row"><label>购买数量</label>
       <div class="qty-ctrl">
         <button id="qtyMinus">−</button>
@@ -265,6 +265,8 @@ async function openDetail(id) {
 }
 
 async function buy(product, qty) {
+  const contact = $('#contactInput') ? $('#contactInput').value.trim() : '';
+  if (!contact) { toast('请先填写联系方式（邮箱或微信），便于发货与售后'); $('#contactInput') && $('#contactInput').focus(); return; }
   $('#buyNow').disabled = true; $('#buyNow').textContent = '下单中…';
   try {
     const r = await fetch('/api/checkout', {

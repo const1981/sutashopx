@@ -155,7 +155,7 @@ function render(p) {
     </div>
     <p class="detail-desc">${p.description || p.subtitle || '暂无描述'}</p>
     <div class="detail-price"><span class="price">${money(p.price)}</span><span class="stock-hint">/ 件</span></div>
-    <div class="contact-row" style="margin:10px 0 6px;"><input id="contactInput" type="text" placeholder="联系方式选填（如邮箱/微信，便于售后）" style="width:100%;padding:11px 14px;border-radius:10px;background:var(--color-paper);border:1px solid var(--color-line);outline:none;"></div>
+    <div class="contact-row" style="margin:10px 0 6px;"><input id="contactInput" type="text" placeholder="联系方式 * 必填（邮箱/微信，用于发货与售后）" style="width:100%;padding:11px 14px;border-radius:10px;background:var(--color-paper);border:1px solid var(--color-line);outline:none;"></div>
     <div class="qty-row" style="margin-bottom:6px;"><label style="width:64px;flex-shrink:0;font-size:13px;color:var(--color-ink-soft);">购买数量</label>
       <div class="qty-ctrl">
         <button id="qtyMinus">−</button>
@@ -184,6 +184,8 @@ function render(p) {
 
 async function buy(p, qty) {
   const btn = $('#buyNow');
+  const contact = ($('#contactInput') ? $('#contactInput').value.trim() : '');
+  if (!contact) { toast('请先填写联系方式（邮箱或微信），便于发货与售后'); $('#contactInput') && $('#contactInput').focus(); return; }
   btn.disabled = true; btn.textContent = '下单中…';
   try {
     const r = await fetch('/api/checkout', {

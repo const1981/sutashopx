@@ -1126,6 +1126,8 @@ async function handleApi(request, env, ctx) {
     const product = await first(env, 'SELECT * FROM products WHERE id=?', productId);
     if (!product) return jsonErr('商品不存在');
     if (product.status !== 1) return jsonErr('商品已下架');
+    // 联系方式必填（邮箱/微信，用于发货与售后）
+    if (!body.contact || !String(body.contact).trim()) return jsonErr('请填写联系方式（邮箱或微信），便于发货与售后');
     qty = Math.max(product.min_buy, Math.min(product.max_buy, qty));
     if (product.stock_mode === 'FINITE') {
       const avail = (await first(env, 'SELECT COUNT(*) AS n FROM cards WHERE product_id=? AND status=0', product.id)).n;
